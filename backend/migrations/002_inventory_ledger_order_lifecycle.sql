@@ -240,6 +240,8 @@ begin
   if p_movement_type not in ('stock_in','return','damaged','adjustment') then
     raise exception 'Unsupported manual stock movement';
   end if;
+  if p_movement_type in ('stock_in','return') and p_quantity_delta < 0 then raise exception 'This movement type requires a positive quantity'; end if;
+  if p_movement_type='damaged' and p_quantity_delta > 0 then raise exception 'Damaged stock must be a negative quantity'; end if;
   select * into v_product from public.products where id=p_product_id and archived_at is null for update;
   if not found then raise exception 'Product not found'; end if;
   v_next := v_product.stock_quantity + p_quantity_delta;
@@ -276,6 +278,7 @@ begin
   select role into v_target_role from public.profiles where id=p_target_user_id for update;
   if not found then raise exception 'Target profile not found'; end if;
   if v_target_role='admin' and p_new_role='staff' then
+    perform 1 from public.profiles where role='admin' for update;
     select count(*) into v_admin_count from public.profiles where role='admin';
     if v_admin_count <= 1 then raise exception 'The last administrator cannot be demoted'; end if;
   end if;
