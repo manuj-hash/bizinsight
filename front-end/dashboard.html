@@ -82,16 +82,16 @@
 
 <script>
 
-const API_URL = "http://localhost:3000/api";
+const API_URL = "/api";
 
 // Use localStorage consistently across all pages
 function getToken() {
-    return localStorage.getItem("bizinsight_token");
+    return sessionStorage.getItem("bizinsight_token");
 }
 
 function getSavedUser() {
     try {
-        return JSON.parse(localStorage.getItem("bizinsight_user") || "{}");
+        return JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
     } catch {
         return {};
     }
@@ -114,7 +114,9 @@ document.getElementById("logoutButton").addEventListener("click", function(event
     event.preventDefault();
 
     localStorage.removeItem("bizinsight_token");
+    sessionStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
+    sessionStorage.removeItem("bizinsight_user");
 
     window.location.href = "index.html";
 });
@@ -226,7 +228,9 @@ async function loadDashboard() {
             error.message.toLowerCase().includes("authentication")
         ) {
             localStorage.removeItem("bizinsight_token");
+    sessionStorage.removeItem("bizinsight_token");
             localStorage.removeItem("bizinsight_user");
+    sessionStorage.removeItem("bizinsight_user");
             window.location.href = "index.html";
         }
 
