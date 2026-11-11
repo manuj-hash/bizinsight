@@ -6,7 +6,7 @@ Baseline preserved at `baseline/original-2026-11-11`. Working changes isolated a
 
 ### Product scope implemented or scaffolded
 - Retained the existing HTML/CSS/vanilla-JavaScript + Node/Express + Supabase stack.
-- Added dedicated Sales & Orders and Customers pages.
+- Added dedicated Sales & Orders, Customers and administrator User Management pages.
 - Rebuilt Inventory around the database's real `stock_quantity` field and added recent stock-movement history.
 - Added editable profile details and a verified current-password change flow.
 - Added Sales & Orders navigation to the existing application modules.
@@ -29,7 +29,7 @@ Baseline preserved at `baseline/original-2026-11-11`. Working changes isolated a
 - Login now stores access tokens in tab-scoped session storage and clears legacy persistent tokens.
 - Dashboard, Analytics, Reports and Profile use same-origin `/api` paths instead of hardcoded localhost URLs.
 - Inventory UI now uses `stock_quantity`, stock movement reasons, archive behavior and stock history.
-- Added `front-end/orders.html` and `front-end/customers.html`.
+- Added `front-end/orders.html`, `front-end/customers.html` and `front-end/users.html`.
 - Updated module navigation and shared responsive styles.
 - Profile page now supports profile editing and password change.
 
