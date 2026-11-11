@@ -81,21 +81,37 @@ const createOrder = async (req, res) => {
 
         // This RPC is deliberately service_role-only. The route's protect
         // middleware has already verified the caller and their staff/admin role.
-        const { data: orderId, error: rpcError } = await getAdminClient().rpc(
+        const rpcArgs = {
+            p_order_number: orderNumber,
+            p_customer_id: customer_id,
+            p_items: items.map(item => ({
+                product_id: item.product_id,
+                quantity: Number(item.quantity)
+            })),
+            p_tax_amount: tax,
+            p_discount_amount: discount,
+            p_status: status,
+            p_created_by: req.user.id
+        };
+
+        const adminClient = getAdminClient();
+        let { data: orderId, error: rpcError } = await adminClient.rpc(
             "create_bizinsight_order",
-            {
-                p_order_number: orderNumber,
-                p_customer_id: customer_id,
-                p_items: items.map(item => ({
-                    product_id: item.product_id,
-                    quantity: Number(item.quantity)
-                })),
-                p_tax_amount: tax,
-                p_discount_amount: discount,
-                p_status: status,
-                p_created_by: req.user.id
-            }
+            rpcArgs
         );
+
+        // Backward compatibility with the already-applied migration 001.
+        // Migration 002 adds p_created_by and the ledger trigger. Only retry
+        // when PostgREST says the new signature is not yet installed.
+        if (rpcError && rpcError.code === "PGRST202") {
+            const { p_created_by, ...legacyArgs } = rpcArgs;
+            const legacyResult = await adminClient.rpc(
+                "create_bizinsight_order",
+                legacyArgs
+            );
+            orderId = legacyResult.data;
+            rpcError = legacyResult.error;
+        }
 
         if (rpcError) throw rpcError;
 
@@ -134,7 +150,14 @@ const updateOrder = async (req, res) => {
             }
         );
 
-        if (error) throw error;
+        if (error) {
+            if (error.code === "PGRST202") {
+                return res.status(409).json({
+                    message: "Order status and stock restoration require database migration 002. Review and apply it before using cancellation or status updates."
+                });
+            }
+            throw error;
+        }
 
         const { data: order, error: fetchError } = await req.supabase
             .from("orders")
