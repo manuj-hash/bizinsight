@@ -27,7 +27,7 @@ const getDashboardAnalytics = async (req, res) => {
         const [orders, products, customersResult] = await Promise.all([
             fetchAllRows(req.supabase, "orders", "id, total_amount, status, ordered_at", "ordered_at"),
             fetchAllRows(req.supabase, "products", "id, stock_quantity, reorder_level, is_active", "created_at"),
-            req.supabase.from("customers").select("id", { count: "exact", head: true })
+            req.supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", true)
         ]);
 
         if (customersResult.error) throw customersResult.error;
