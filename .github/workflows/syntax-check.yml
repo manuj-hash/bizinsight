@@ -18,3 +18,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci --prefix backend
       - run: node scripts/check-syntax.js
+      - name: Report dependency audit summary
+        continue-on-error: true
+        run: |
+          npm audit --prefix backend --json > /tmp/bizinsight-audit.json || true
+          node -e "const a=require('/tmp/bizinsight-audit.json'); console.log('Dependency audit summary:', JSON.stringify(a.metadata?.vulnerabilities || {})); for (const [name, v] of Object.entries(a.vulnerabilities || {})) console.log(name + ': ' + v.severity + ', direct=' + v.isDirect + ', fix=' + JSON.stringify(v.fixAvailable));"
