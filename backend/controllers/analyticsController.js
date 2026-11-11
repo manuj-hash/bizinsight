@@ -1,83 +1,65 @@
-const supabase = require("../config/supabase");
+const PAGE_SIZE = 1000;
+
+// Supabase REST responses are capped. Fetch in bounded pages rather than
+// silently calculating business metrics from only the first response page.
+async function fetchAllRows(client, table, columns, orderColumn) {
+    const rows = [];
+    let from = 0;
+
+    while (true) {
+        let query = client.from(table).select(columns);
+        if (orderColumn) query = query.order(orderColumn, { ascending: true });
+
+        const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+    }
+
+    return rows;
+}
 
 const getDashboardAnalytics = async (req, res) => {
     try {
-        const [
-            ordersResult,
-            productsResult,
-            customersResult
-        ] = await Promise.all([
-            supabase
-                .from("orders")
-                .select("id, total_amount, status, ordered_at"),
-
-            supabase
-                .from("products")
-                .select("id, stock_quantity, reorder_level, is_active"),
-
-            supabase
-                .from("customers")
-                .select("id", { count: "exact", head: true })
+        const [orders, products, customersResult] = await Promise.all([
+            fetchAllRows(req.supabase, "orders", "id, total_amount, status, ordered_at", "ordered_at"),
+            fetchAllRows(req.supabase, "products", "id, stock_quantity, reorder_level, is_active", "created_at"),
+            req.supabase.from("customers").select("id", { count: "exact", head: true })
         ]);
 
-        if (ordersResult.error) throw ordersResult.error;
-        if (productsResult.error) throw productsResult.error;
         if (customersResult.error) throw customersResult.error;
 
-        const orders = ordersResult.data || [];
-        const products = productsResult.data || [];
-
-        const completedOrders = orders.filter(
-            order => order.status === "completed"
-        );
-
+        const completedOrders = orders.filter(order => order.status === "completed");
         const totalSales = completedOrders.reduce(
-            (sum, order) => sum + Number(order.total_amount || 0),
-            0
+            (sum, order) => sum + Number(order.total_amount || 0), 0
         );
-
-        const lowStockProducts = products.filter(
-            product =>
-                product.is_active !== false &&
-                Number(product.stock_quantity) <= Number(product.reorder_level)
+        const lowStockProducts = products.filter(product =>
+            product.is_active !== false &&
+            Number(product.stock_quantity) <= Number(product.reorder_level)
         );
 
         const now = new Date();
-        const currentMonthStart = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            1
-        );
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-        const previousMonthStart = new Date(
-            now.getFullYear(),
-            now.getMonth() - 1,
-            1
-        );
+        const sumBetween = (list, start, end) => list.reduce((sum, order) => {
+            const date = new Date(order.ordered_at);
+            return date >= start && (!end || date < end)
+                ? sum + Number(order.total_amount || 0)
+                : sum;
+        }, 0);
 
-        const currentMonthSales = completedOrders
-            .filter(order => new Date(order.ordered_at) >= currentMonthStart)
-            .reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
-
-        const previousMonthSales = completedOrders
-            .filter(order => {
-                const date = new Date(order.ordered_at);
-                return date >= previousMonthStart && date < currentMonthStart;
-            })
-            .reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
-
+        const currentMonthSales = sumBetween(completedOrders, currentMonthStart, null);
+        const previousMonthSales = sumBetween(completedOrders, previousMonthStart, currentMonthStart);
         const growthPercent = previousMonthSales === 0
             ? null
-            : Number(
-                (
-                    ((currentMonthSales - previousMonthSales) /
-                        previousMonthSales) *
-                    100
-                ).toFixed(2)
-            );
+            : Number((((currentMonthSales - previousMonthSales) / previousMonthSales) * 100).toFixed(2));
 
-        res.status(200).json({
-            totalProducts: products.length,
+        return res.status(200).json({
+            totalProducts: products.filter(product => product.is_active !== false).length,
             totalCustomers: customersResult.count || 0,
             totalOrders: orders.length,
             completedOrders: completedOrders.length,
@@ -89,93 +71,69 @@ const getDashboardAnalytics = async (req, res) => {
             growthPercent
         });
     } catch (error) {
-        res.status(500).json({
-            message: error.message
-        });
+        console.error("Dashboard analytics:", error.message);
+        return res.status(500).json({ message: "Unable to calculate dashboard analytics" });
     }
 };
 
 const getSalesAnalytics = async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from("orders")
-            .select("id, order_number, total_amount, status, ordered_at")
-            .order("ordered_at", { ascending: true });
-
-        if (error) throw error;
+        const data = await fetchAllRows(
+            req.supabase,
+            "orders",
+            "id, order_number, total_amount, status, ordered_at",
+            "ordered_at"
+        );
 
         const monthlySales = {};
+        data.filter(order => order.status === "completed").forEach(order => {
+            const date = new Date(order.ordered_at);
+            const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+            monthlySales[month] = (monthlySales[month] || 0) + Number(order.total_amount || 0);
+        });
 
-        (data || [])
-            .filter(order => order.status === "completed")
-            .forEach(order => {
-                const date = new Date(order.ordered_at);
-                const month = `${date.getFullYear()}-${String(
-                    date.getMonth() + 1
-                ).padStart(2, "0")}`;
-
-                monthlySales[month] =
-                    (monthlySales[month] || 0) +
-                    Number(order.total_amount || 0);
-            });
-
-        res.status(200).json({
-            monthlySales: Object.entries(monthlySales).map(
-                ([month, sales]) => ({
-                    month,
-                    sales: Number(sales.toFixed(2))
-                })
-            ),
-            orders: data || []
+        return res.status(200).json({
+            monthlySales: Object.entries(monthlySales).map(([month, sales]) => ({
+                month,
+                sales: Number(sales.toFixed(2))
+            })),
+            orders: data
         });
     } catch (error) {
-        res.status(500).json({
-            message: error.message
-        });
+        console.error("Sales analytics:", error.message);
+        return res.status(500).json({ message: "Unable to calculate sales analytics" });
     }
 };
 
 const getInventoryAnalytics = async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from("products")
-            .select("id, sku, name, category, price, stock_quantity, reorder_level, is_active")
-            .order("name");
-
-        if (error) throw error;
-
-        const products = data || [];
-
-        const lowStock = products.filter(
-            product =>
-                product.is_active !== false &&
-                Number(product.stock_quantity) <= Number(product.reorder_level)
+        const products = await fetchAllRows(
+            req.supabase,
+            "products",
+            "id, sku, name, category, price, stock_quantity, reorder_level, is_active",
+            "name"
         );
 
-        const inventoryValue = products.reduce(
-            (sum, product) =>
-                sum +
-                Number(product.price || 0) *
-                Number(product.stock_quantity || 0),
+        const activeProducts = products.filter(product => product.is_active !== false);
+        const lowStock = activeProducts.filter(product =>
+            Number(product.stock_quantity) <= Number(product.reorder_level)
+        );
+        const inventoryValue = activeProducts.reduce(
+            (sum, product) => sum + Number(product.price || 0) * Number(product.stock_quantity || 0),
             0
         );
 
-        res.status(200).json({
-            totalProducts: products.length,
+        return res.status(200).json({
+            totalProducts: activeProducts.length,
             lowStockCount: lowStock.length,
             inventoryValue: Number(inventoryValue.toFixed(2)),
             lowStockProducts: lowStock,
-            products
+            products: activeProducts
         });
     } catch (error) {
-        res.status(500).json({
-            message: error.message
-        });
+        console.error("Inventory analytics:", error.message);
+        return res.status(500).json({ message: "Unable to calculate inventory analytics" });
     }
 };
 
-module.exports = {
-    getDashboardAnalytics,
-    getSalesAnalytics,
-    getInventoryAnalytics
-};
+module.exports = { getDashboardAnalytics, getSalesAnalytics, getInventoryAnalytics };
