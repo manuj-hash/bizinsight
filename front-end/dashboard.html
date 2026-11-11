@@ -17,6 +17,7 @@
     <a href="customers.html">Customers</a>
     <a href="analytics.html">📊 Analytics</a>
     <a href="reports.html">📄 Reports</a>
+    <a href="users.html" id="adminUsersLink">User Management</a>
     <a href="profile.html">👤 Profile</a>
     <a href="#" id="logoutButton" class="lout">🚪 Logout</a>
 </div>
@@ -245,5 +246,17 @@ if (token) {
 
 </script>
 
+<script>
+try {
+    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
+    if (navUser.role !== "admin") {
+        const adminLink = document.getElementById("adminUsersLink");
+        if (adminLink) adminLink.hidden = true;
+    }
+} catch (_) {
+    const adminLink = document.getElementById("adminUsersLink");
+    if (adminLink) adminLink.hidden = true;
+}
+</script>
 </body>
 </html>
