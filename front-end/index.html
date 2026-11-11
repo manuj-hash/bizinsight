@@ -189,17 +189,9 @@
 
                 }
 
-                // Save authentication details
-                localStorage.setItem(
-                    "bizinsight_token",
-                    data.token
-                );
-
-                localStorage.setItem(
-                    "bizinsight_user",
-                    JSON.stringify(data.profile)
-                );
-
+                // Keep authentication tab-scoped; remove any legacy persistent tokens.
+                localStorage.removeItem("bizinsight_token");
+                localStorage.removeItem("bizinsight_user");
                 sessionStorage.setItem(
                     "bizinsight_token",
                     data.token
