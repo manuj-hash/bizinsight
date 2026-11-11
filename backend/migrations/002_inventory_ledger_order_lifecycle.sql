@@ -52,6 +52,41 @@ CREATE POLICY "Staff and admins read inventory movements"
 REVOKE ALL ON public.inventory_movements FROM anon, authenticated;
 GRANT SELECT ON public.inventory_movements TO authenticated;
 
+-- Preserve historical references: API and direct Data API clients cannot hard-delete
+-- products, customers, orders or order items.
+REVOKE DELETE ON public.products, public.customers FROM authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.products, public.customers TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.guard_bizinsight_archive()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+BEGIN
+  IF NEW.is_active IS DISTINCT FROM OLD.is_active
+     AND NOT EXISTS (
+       SELECT 1 FROM public.profiles
+       WHERE id = (SELECT auth.uid()) AND role = 'admin'
+     ) THEN
+    RAISE EXCEPTION 'Only an administrator may archive or reactivate records';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION private.guard_bizinsight_archive() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS guard_bizinsight_product_archive ON public.products;
+CREATE TRIGGER guard_bizinsight_product_archive
+  BEFORE UPDATE OF is_active ON public.products
+  FOR EACH ROW EXECUTE FUNCTION private.guard_bizinsight_archive();
+
+DROP TRIGGER IF EXISTS guard_bizinsight_customer_archive ON public.customers;
+CREATE TRIGGER guard_bizinsight_customer_archive
+  BEFORE UPDATE OF is_active ON public.customers
+  FOR EACH ROW EXECUTE FUNCTION private.guard_bizinsight_archive();
+
 -- Preserve a baseline movement for stock that already exists before the ledger.
 INSERT INTO public.inventory_movements (
   product_id, movement_type, quantity_delta, quantity_before,
