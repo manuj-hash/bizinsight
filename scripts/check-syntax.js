@@ -10,8 +10,13 @@ const failures = [];
 function walk(directory, predicate) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const fullPath = path.join(directory, entry.name);
-        if (entry.isDirectory()) walk(fullPath, predicate);
-        else if (predicate(fullPath)) checkJavaScript(fullPath, fs.readFileSync(fullPath, "utf8"));
+        if (entry.isDirectory()) {
+            if (entry.name !== "node_modules" && entry.name !== ".git") {
+                walk(fullPath, predicate);
+            }
+        } else if (predicate(fullPath)) {
+            checkJavaScript(fullPath, fs.readFileSync(fullPath, "utf8"));
+        }
     }
 }
 
