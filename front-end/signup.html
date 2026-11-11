@@ -3,54 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BizInsight Sign Up</title>
-    <link rel="stylesheet" href="signup.css">
+    <title>BizInsight | Staff invitation required</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .notice{max-width:460px;background:#fff;padding:36px;border-radius:18px;text-align:center;margin:auto;box-shadow:0 10px 25px rgba(0,0,0,.15)}
+        .notice p{line-height:1.6}
+        .notice a{display:inline-block;margin-top:18px;color:#6a11cb;font-weight:700}
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="signup-card">
-            <h1>BizInsight<h1>
-            <p>Create your Account</p>
-
-            <form>
-                <label>Full Name</label>
-                <input type="text" placeholder="Enter Full Name" required>
-                
-                <label>Email</label>
-                <input type="email" placeholder="Enter Email" required>
-
-                <label>Mobile Number</label>
-                <input type="tel" placeholder="Enter Mobile Number" required>
-
-                    <label>Department</label>
-                    <select required>
-                        <option value="">Select Department</option>
-                        <option>Management</option>
-                        <option>Sales</option>
-                        <option>Inventory</option>
-                        <option>Finance</option>
-                        <option>Marketing</option>
-                    </select>
-
-                <label>Password</label>
-                <input type="password" placeholder="Enter Password" required>
-
-                <label>Confirm Password</label>
-                <input type="password" placeholder="Confirm password">
-
-                <button class="signup-btn">
-                Create Account
-                </button>
-
-            <div class="links">
-                <p>
-                    Already have an account?
-                    <a href="index.html">Sign in</a>
-                </p>
-            </div>
-
-            </form>
-        </div>
-    </div>
+    <main class="notice">
+        <h1>BizInsight</h1>
+        <h2>Staff access is invitation-only</h2>
+        <p>Public account registration is disabled. Ask your BizInsight administrator to send you a staff invitation. Use the invitation email to activate your account.</p>
+        <a href="index.html">Return to sign in</a>
+    </main>
 </body>
 </html>
