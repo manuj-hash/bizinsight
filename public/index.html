@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>BizInsight | Business Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark">B</div>
+      <p class="eyebrow">BUSINESS INTELLIGENCE PLATFORM</p>
+      <h1>Welcome back</h1>
+      <p class="muted">Sign in to continue to BizInsight.</p>
+      <label for="email">Email address</label>
+      <input id="email" name="email" type="email" autocomplete="username" placeholder="you@company.com" required>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+      <button class="primary-btn full" type="submit">Sign in</button>
+      <p id="login-error" class="form-error" role="alert"></p>
+      <p class="login-note">Access is managed by your BizInsight administrator.</p>
+    </form>
+  </div>
+
+  <div id="app-shell" class="app-shell hidden">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" data-page="dashboard">
+        <span class="brand-mark small">B</span>
+        <span><strong>BizInsight</strong><small>Business intelligence</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-link active" data-page="dashboard"><span>▦</span>Dashboard</button>
+        <button class="nav-link" data-page="inventory"><span>▤</span>Inventory</button>
+        <button class="nav-link" data-page="sales"><span>↗</span>Sales & Orders</button>
+        <button class="nav-link" data-page="customers"><span>♙</span>Customers</button>
+        <button class="nav-link" data-page="analytics"><span>⌁</span>Analytics</button>
+        <button class="nav-link" data-page="reports"><span>▧</span>Reports</button>
+        <div class="nav-divider"></div>
+        <div class="workspace-label">MANAGEMENT</div>
+        <button class="nav-link" data-page="stock-history"><span>◷</span>Stock History</button>
+        <button class="nav-link admin-only" data-page="users"><span>♧</span>User Management</button>
+        <button class="nav-link" data-page="profile"><span>◉</span>My Profile</button>
+        <button class="nav-link" data-page="settings"><span>⚙</span>Settings</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="help-card"><strong>Need a hand?</strong><span>Review your business activity and insights.</span></div>
+        <button id="logout-btn" class="logout-btn">↪ <span>Sign out</span></button>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
+        <div><p class="eyebrow" id="page-eyebrow">OVERVIEW</p><h1 id="page-title">Dashboard</h1></div>
+        <div class="topbar-right">
+          <span class="status-dot"></span><span class="live-label">Connected workspace</span>
+          <div class="user-chip"><span class="avatar" id="user-avatar">A</span><span><strong id="user-name">Admin User</strong><small id="user-role">Administrator</small></span></div>
+        </div>
+      </header>
+      <section id="page-content" class="page-content" aria-live="polite">
+        <div class="loading-state">Loading your business workspace…</div>
+      </section>
+      <footer class="app-footer"><span>BizInsight</span><span>Business Analytics & Decision Support</span></footer>
+    </main>
+  </div>
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="./assets/js/app.js" defer></script>
+</body>
+</html>
