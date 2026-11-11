@@ -84,15 +84,17 @@
 </div>
 
 <script>
-const API_URL = "http://localhost:3000/api/auth/me";
+const API_URL = "/api/auth/me";
 
 function getToken() {
-    return localStorage.getItem("bizinsight_token");
+    return sessionStorage.getItem("bizinsight_token");
 }
 
 function logout() {
     localStorage.removeItem("bizinsight_token");
+    sessionStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
+    sessionStorage.removeItem("bizinsight_user");
 }
 
 function showMessage(message, isError = false) {
