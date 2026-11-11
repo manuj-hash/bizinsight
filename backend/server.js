@@ -1,5 +1,6 @@
 require("dotenv").config();
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -168,7 +169,7 @@ app.get("/api/orders", wrap(async(req,res)=>{
 app.post("/api/orders", wrap(async(req,res)=>{
   const b=req.body||{};
   if(!Array.isArray(b.items)||!b.items.length)return fail(res,400,"At least one order item is required");
-  const orderNumber=b.order_number||("BI-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+crypto.randomUUID().slice(0,8).toUpperCase());
+  const orderNumber=b.order_number||("BI-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+randomUUID().slice(0,8).toUpperCase());
   const {data,error}=await req.sb.rpc("create_bizinsight_order_v2",{
     p_order_number:orderNumber,p_customer_id:b.customer_id||null,p_items:b.items,
     p_tax_amount:numeric(b.tax_amount),p_discount_amount:numeric(b.discount_amount)
@@ -233,5 +234,5 @@ app.patch("/api/users/:id/role", adminOnly, wrap(async(req,res)=>{
 app.use("/api",(_req,res)=>res.status(404).json({message:"API endpoint not found"}));
 app.use((err,_req,res,_next)=>{console.error(err);res.status(500).json({message:"Unexpected server error"});});
 app.use(express.static(path.join(__dirname,"..","public"),{dotfiles:"deny",index:"index.html",etag:true}));
-app.get("*",(req,res,next)=>req.path.startsWith("/api/")?next():res.sendFile(path.join(__dirname,"..","public","index.html")));
+
 app.listen(PORT,()=>console.log("BizInsight API running on http://localhost:"+PORT));
