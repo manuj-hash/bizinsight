@@ -98,8 +98,7 @@ const getSalesAnalytics = async (req, res) => {
 
         const monthlySales = {};
         data.filter(order => order.status === "completed").forEach(order => {
-            const date = new Date(order.ordered_at);
-            const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+            const month = monthKey(order.ordered_at);
             monthlySales[month] = (monthlySales[month] || 0) + Number(order.total_amount || 0);
         });
 
