@@ -121,7 +121,7 @@ const updateProduct = async (req, res) => {
 
         const allowedFields = [
             "sku", "name", "description", "category",
-            "price", "cost_price", "reorder_level", "is_active"
+            "price", "cost_price", "reorder_level"
         ];
         const updates = {};
 
