@@ -1,4 +1,16 @@
 const PAGE_SIZE = 1000;
+const BUSINESS_TIME_ZONE = process.env.BUSINESS_TIME_ZONE || "Asia/Kolkata";
+
+function monthKey(value) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: BUSINESS_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit"
+    }).formatToParts(new Date(value));
+    const year = parts.find(part => part.type === "year").value;
+    const month = parts.find(part => part.type === "month").value;
+    return year + "-" + month;
+}
 
 // Supabase REST responses are capped. Fetch in bounded pages rather than
 // silently calculating business metrics from only the first response page.
@@ -41,19 +53,18 @@ const getDashboardAnalytics = async (req, res) => {
             Number(product.stock_quantity) <= Number(product.reorder_level)
         );
 
-        const now = new Date();
-        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const currentMonthKey = monthKey(new Date());
+        const [year, month] = currentMonthKey.split("-").map(Number);
+        const previousMonthKey = monthKey(new Date(Date.UTC(year, month - 2, 15, 12)));
 
-        const sumBetween = (list, start, end) => list.reduce((sum, order) => {
-            const date = new Date(order.ordered_at);
-            return date >= start && (!end || date < end)
+        const currentMonthSales = completedOrders.reduce((sum, order) =>
+            monthKey(order.ordered_at) === currentMonthKey
                 ? sum + Number(order.total_amount || 0)
-                : sum;
-        }, 0);
-
-        const currentMonthSales = sumBetween(completedOrders, currentMonthStart, null);
-        const previousMonthSales = sumBetween(completedOrders, previousMonthStart, currentMonthStart);
+                : sum, 0);
+        const previousMonthSales = completedOrders.reduce((sum, order) =>
+            monthKey(order.ordered_at) === previousMonthKey
+                ? sum + Number(order.total_amount || 0)
+                : sum, 0);
         const growthPercent = previousMonthSales === 0
             ? null
             : Number((((currentMonthSales - previousMonthSales) / previousMonthSales) * 100).toFixed(2));
@@ -118,7 +129,11 @@ const getInventoryAnalytics = async (req, res) => {
         const lowStock = activeProducts.filter(product =>
             Number(product.stock_quantity) <= Number(product.reorder_level)
         );
-        const inventoryValue = activeProducts.reduce(
+        const inventoryCostValue = activeProducts.reduce(
+            (sum, product) => sum + Number(product.cost_price || 0) * Number(product.stock_quantity || 0),
+            0
+        );
+        const potentialRetailValue = activeProducts.reduce(
             (sum, product) => sum + Number(product.price || 0) * Number(product.stock_quantity || 0),
             0
         );
@@ -126,7 +141,9 @@ const getInventoryAnalytics = async (req, res) => {
         return res.status(200).json({
             totalProducts: activeProducts.length,
             lowStockCount: lowStock.length,
-            inventoryValue: Number(inventoryValue.toFixed(2)),
+            inventoryValue: Number(inventoryCostValue.toFixed(2)),
+            inventoryCostValue: Number(inventoryCostValue.toFixed(2)),
+            potentialRetailValue: Number(potentialRetailValue.toFixed(2)),
             lowStockProducts: lowStock,
             products: activeProducts
         });
