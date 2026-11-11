@@ -5,6 +5,7 @@ const getCustomers = async (req, res) => {
         const { data, error } = await req.supabase
             .from("customers")
             .select("*")
+            .eq("is_active", true)
             .order("created_at", { ascending: false });
         if (error) throw error;
         return res.status(200).json(data || []);
