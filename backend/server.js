@@ -10,7 +10,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin(origin, callback) {
+        // Same-origin requests do not need CORS headers. Cross-origin access
+        // is allowed only for explicitly configured frontend origins.
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(null, false);
+    }
+}));
 app.use(express.json({ limit: "1mb" }));
 
 // Exact frontend location
@@ -48,6 +60,7 @@ app.get("/api/status", (req, res) => {
 // API routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
+app.use("/api/inventory/movements", require("./routes/inventoryMovementRoutes"));
 app.use("/api/customers", require("./routes/customerRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
