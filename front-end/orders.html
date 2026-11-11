@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizInsight | Sales & Orders</title>
+    <link rel="stylesheet" href="inventory.css">
+</head>
+<body>
+<div class="sidebar">
+    <h2>BizInsight</h2>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
+    <a href="orders.html" class="active">Sales & Orders</a>
+    <a href="customers.html">Customers</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="reports.html">Reports</a>
+    <a href="profile.html">Profile</a>
+    <a href="index.html" class="lout" id="logoutLink">Logout</a>
+</div>
+
+<div class="main-content">
+<div class="container">
+    <h1>Sales & Orders</h1>
+    <p>Create sales orders, monitor order progress and preserve transaction history.</p>
+    <p id="message" role="status" aria-live="polite"></p>
+
+    <section class="form-container">
+        <h3>Create Sales Order</h3>
+        <form id="orderForm">
+            <label for="customerSelect">Customer (optional)</label>
+            <select id="customerSelect">
+                <option value="">Walk-in customer</option>
+            </select>
+
+            <h4>Order items</h4>
+            <div id="itemRows"></div>
+            <button type="button" id="addItemButton">Add another item</button>
+
+            <label for="taxAmount">Tax amount (₹)</label>
+            <input id="taxAmount" type="number" min="0" step="0.01" value="0">
+
+            <label for="discountAmount">Discount amount (₹)</label>
+            <input id="discountAmount" type="number" min="0" step="0.01" value="0">
+
+            <button type="submit" id="createOrderButton">Create Order</button>
+        </form>
+    </section>
+
+    <section class="table-container">
+        <h3>Order History</h3>
+        <button type="button" id="refreshOrders">Refresh orders</button>
+        <div style="overflow-x:auto">
+            <table>
+                <thead><tr>
+                    <th>Order</th><th>Customer</th><th>Date</th>
+                    <th>Status</th><th>Total</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="ordersBody">
+                    <tr><td colspan="6">Loading orders...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+</div>
+
+<script>
+const API="/api";
+const token=()=>sessionStorage.getItem("bizinsight_token");
+let products=[];
+let customers=[];
+
+function headers(json=false){
+    if(!token()) throw new Error("Your session has expired. Please sign in again.");
+    const h={Authorization:"Bearer "+token()};
+    if(json) h["Content-Type"]="application/json";
+    return h;
+}
+function showMessage(message,error=false){
+    const el=document.getElementById("message");
+    el.textContent=message;
+    el.style.color=error?"#b42318":"#16794b";
+}
+async function api(path,options={}){
+    const response=await fetch(API+path,{...options,headers:{...headers(Boolean(options.body)),...(options.headers||{})}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.message||"Request failed");
+    return data;
+}
+function currency(value){
+    return Number(value||0).toLocaleString("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2});
+}
+function addItemRow(selectedId="",quantity=1){
+    const row=document.createElement("div");
+    row.className="order-item-row";
+    row.style.display="grid";
+    row.style.gridTemplateColumns="minmax(220px,1fr) 110px auto";
+    row.style.gap="10px";
+    row.style.margin="10px 0";
+
+    const select=document.createElement("select");
+    select.className="product-choice";
+    select.required=true;
+    const first=document.createElement("option");
+    first.value="";
+    first.textContent="Select product";
+    select.append(first);
+
+    products.filter(p=>p.is_active!==false).forEach(product=>{
+        const option=document.createElement("option");
+        option.value=product.id;
+        option.textContent=product.name+" ("+product.sku+") — stock "+product.stock_quantity;
+        option.disabled=Number(product.stock_quantity)<=0;
+        if(String(product.id)===String(selectedId)) option.selected=true;
+        select.append(option);
+    });
+
+    const qty=document.createElement("input");
+    qty.type="number"; qty.className="item-quantity";
+    qty.min="1"; qty.step="1"; qty.value=quantity; qty.required=true;
+    qty.setAttribute("aria-label","Quantity");
+
+    const remove=document.createElement("button");
+    remove.type="button"; remove.textContent="Remove";
+    remove.addEventListener("click",()=>row.remove());
+
+    row.append(select,qty,remove);
+    document.getElementById("itemRows").append(row);
+}
+async function loadReferenceData(){
+    const [productData,customerData]=await Promise.all([api("/products"),api("/customers")]);
+    products=(Array.isArray(productData)?productData:productData.products||[]).filter(p=>p.is_active!==false);
+    customers=(Array.isArray(customerData)?customerData:customerData.customers||[]).filter(c=>c.is_active!==false);
+    const select=document.getElementById("customerSelect");
+    select.replaceChildren(new Option("Walk-in customer",""));
+    customers.forEach(customer=>select.add(new Option(customer.name,customer.id)));
+    if(!document.querySelector(".order-item-row")) addItemRow();
+}
+function cell(row,value){
+    const td=row.insertCell(); td.textContent=value==null?"—":String(value); return td;
+}
+async function loadOrders(){
+    const body=document.getElementById("ordersBody");
+    try{
+        const rows=await api("/orders");
+        body.replaceChildren();
+        if(!rows.length){body.innerHTML='<tr><td colspan="6">No orders recorded yet.</td></tr>';return;}
+        rows.forEach(order=>{
+            const row=body.insertRow();
+            cell(row,order.order_number);
+            cell(row,order.customers?.name||"Walk-in");
+            cell(row,order.ordered_at?new Date(order.ordered_at).toLocaleString("en-IN"):"—");
+            cell(row,order.status);
+            cell(row,currency(order.total_amount));
+            const actions=row.insertCell();
+            const addAction=(label,status)=>{
+                const button=document.createElement("button");
+                button.type="button";button.textContent=label;
+                button.addEventListener("click",()=>changeStatus(order,status));
+                actions.append(button,document.createTextNode(" "));
+            };
+            if(order.status==="pending"){addAction("Process","processing");addAction("Complete","completed");addAction("Cancel","cancelled");}
+            if(order.status==="processing"){addAction("Complete","completed");addAction("Cancel","cancelled");}
+            if(order.status==="completed"||order.status==="cancelled") cell(row,"—");
+        });
+    }catch(error){
+        body.innerHTML='<tr><td colspan="6">Unable to load orders.</td></tr>';
+        showMessage(error.message,true);
+    }
+}
+async function changeStatus(order,status){
+    let reason=null;
+    if(status==="cancelled"){
+        reason=prompt("Why is this order being cancelled? Stock will be restored.", "Customer cancellation");
+        if(!reason||reason.trim().length<3) return;
+    }
+    try{
+        const result=await api("/orders/"+encodeURIComponent(order.id),{
+            method:"PUT",body:JSON.stringify({status,reason})
+        });
+        showMessage(result.message||"Order updated.");
+        await loadOrders();
+    }catch(error){showMessage(error.message,true);}
+}
+
+document.getElementById("orderForm").addEventListener("submit",async event=>{
+    event.preventDefault();
+    const rows=[...document.querySelectorAll(".order-item-row")];
+    const items=rows.map(row=>({
+        product_id:row.querySelector(".product-choice").value,
+        quantity:Number(row.querySelector(".item-quantity").value)
+    }));
+    if(!items.length||items.some(item=>!item.product_id||!Number.isInteger(item.quantity)||item.quantity<=0)){
+        return showMessage("Add at least one valid product and quantity.",true);
+    }
+    const tax=Number(document.getElementById("taxAmount").value||0);
+    const discount=Number(document.getElementById("discountAmount").value||0);
+    if(!Number.isFinite(tax)||!Number.isFinite(discount)||tax<0||discount<0){
+        return showMessage("Tax and discount must be non-negative amounts.",true);
+    }
+    const button=document.getElementById("createOrderButton");button.disabled=true;
+    try{
+        const result=await api("/orders",{method:"POST",body:JSON.stringify({
+            customer_id:document.getElementById("customerSelect").value||null,
+            items,tax_amount:tax,discount_amount:discount,status:"pending"
+        })});
+        showMessage(result.message||"Order created successfully.");
+        document.getElementById("orderForm").reset();
+        document.getElementById("itemRows").replaceChildren();
+        addItemRow();
+        await loadReferenceData();
+        await loadOrders();
+    }catch(error){showMessage(error.message,true);}
+    finally{button.disabled=false;}
+});
+document.getElementById("addItemButton").addEventListener("click",()=>addItemRow());
+document.getElementById("refreshOrders").addEventListener("click",loadOrders);
+document.getElementById("logoutLink").addEventListener("click",()=>{
+    sessionStorage.clear();
+    localStorage.removeItem("bizinsight_token");
+    localStorage.removeItem("bizinsight_user");
+});
+document.addEventListener("DOMContentLoaded",async()=>{
+    if(!token()){window.location.href="index.html";return;}
+    try{await loadReferenceData();await loadOrders();}
+    catch(error){showMessage(error.message,true);}
+});
+</script>
+</body>
+</html>
