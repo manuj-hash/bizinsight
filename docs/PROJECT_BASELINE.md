@@ -25,8 +25,8 @@ Future capabilities (not yet implemented): returns/refunds, payment lifecycle, d
 ## Protected original baseline
 The exact pre-improvement source is preserved on GitHub branch:
 - `baseline/original-2026-11-11`
-- Main baseline commit at start of work: `0b8a824` (short SHA)
-- The working changes are isolated on `improvements/phase-1`.
+- Main baseline commit at start of work: `0b8a8248c69bcee85eda958fa48501b76168ae69`
+- The working changes are isolated on `improvements/phase-1`. The original `main` branch remains unchanged until the draft PR is reviewed and explicitly merged.
 
 Do not rewrite the baseline branch. All changes must be reviewable against it.
 
