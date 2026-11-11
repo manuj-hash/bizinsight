@@ -162,7 +162,7 @@ app.delete("/api/customers/:id", adminOnly, wrap(async(req,res)=>{
 
 app.get("/api/orders", wrap(async(req,res)=>{
   const {data,error}=await req.sb.from("orders")
-    .select("*,customers(name,email),order_items(id,product_id,quantity,unit_price,line_total,products(name,sku))")
+    .select("*,customers(name,email),order_items(id,product_id,quantity,unit_price,line_total,products(name,sku,cost_price))")
     .order("ordered_at",{ascending:false}).limit(500);
   if(error)return dbError(res,error);res.json(data||[]);
 }));
