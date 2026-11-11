@@ -255,5 +255,35 @@ $;
 revoke all on function public.adjust_bizinsight_stock(uuid,integer,text,text) from public, anon;
 grant execute on function public.adjust_bizinsight_stock(uuid,integer,text,text) to authenticated;
 
+
+-- Privileged role change: narrowly scoped SECURITY DEFINER with explicit caller checks.
+create or replace function public.set_bizinsight_user_role(p_target_user_id uuid,p_new_role text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_actor_role text;
+  v_target_role text;
+  v_admin_count integer;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  select role into v_actor_role from public.profiles where id=auth.uid();
+  if v_actor_role is distinct from 'admin' then raise exception 'Administrator access required'; end if;
+  if p_new_role not in ('admin','staff') then raise exception 'Role must be admin or staff'; end if;
+  if p_target_user_id=auth.uid() then raise exception 'You cannot change your own role'; end if;
+  select role into v_target_role from public.profiles where id=p_target_user_id for update;
+  if not found then raise exception 'Target profile not found'; end if;
+  if v_target_role='admin' and p_new_role='staff' then
+    select count(*) into v_admin_count from public.profiles where role='admin';
+    if v_admin_count <= 1 then raise exception 'The last administrator cannot be demoted'; end if;
+  end if;
+  update public.profiles set role=p_new_role,updated_at=now() where id=p_target_user_id;
+end;
+$;
+revoke all on function public.set_bizinsight_user_role(uuid,text) from public, anon;
+grant execute on function public.set_bizinsight_user_role(uuid,text) to authenticated;
+
 -- Keep the old service-role-only function for compatibility; new API must use v2.
 commit;
