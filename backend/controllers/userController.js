@@ -1,4 +1,4 @@
-const { getAdminClient } = require("../config/supabase");
+const { authClient, getAdminClient } = require("../config/supabase");
 
 const getUsers = async (req, res) => {
     try {
@@ -89,5 +89,43 @@ const updateUserRole = async (req, res) => {
     }
 };
 
+
+const updateMyPassword = async (req, res) => {
+    try {
+        const currentPassword = req.body.current_password;
+        const newPassword = req.body.new_password;
+
+        if (typeof currentPassword !== "string" || !currentPassword ||
+            typeof newPassword !== "string" || newPassword.length < 8) {
+            return res.status(400).json({
+                message: "Current password and a new password of at least 8 characters are required"
+            });
+        }
+
+        // Verify the caller knows their current password before using the
+        // server-only Auth Admin API to update their own account.
+        const { data: verified, error: verifyError } =
+            await authClient.auth.signInWithPassword({
+                email: req.user.email,
+                password: currentPassword
+            });
+
+        if (verifyError || !verified.user || verified.user.id !== req.user.id) {
+            return res.status(400).json({ message: "Current password is incorrect" });
+        }
+
+        const { error: updateError } = await getAdminClient().auth.admin.updateUserById(
+            req.user.id,
+            { password: newPassword }
+        );
+        if (updateError) throw updateError;
+
+        return res.status(200).json({ message: "Password updated successfully. Please sign in again." });
+    } catch (error) {
+        console.error("Update password:", error.message);
+        return res.status(400).json({ message: error.message || "Unable to update password" });
+    }
+};
+
 const inviteStaff = require("./authController").inviteStaff;
-module.exports = { getUsers, getUser, updateMyProfile, updateUserRole, inviteStaff };
+module.exports = { getUsers, getUser, updateMyProfile, updateMyPassword, updateUserRole, inviteStaff };
