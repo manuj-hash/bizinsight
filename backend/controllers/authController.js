@@ -1,4 +1,4 @@
-const { authClient, createUserClient, getAdminClient } = require("../config/supabase");
+const { createAuthClient, createUserClient, getAdminClient } = require("../config/supabase");
 
 // Public registration is intentionally disabled. Administrators invite staff.
 const register = async (req, res) => {
@@ -18,7 +18,7 @@ const login = async (req, res) => {
             });
         }
 
-        const { data, error } = await authClient.auth.signInWithPassword({
+        const { data, error } = await createAuthClient().auth.signInWithPassword({
             email,
             password
         });
