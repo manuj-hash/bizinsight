@@ -227,8 +227,10 @@ app.put("/api/users/me", wrap(async(req,res)=>{
 app.patch("/api/users/:id/role", adminOnly, wrap(async(req,res)=>{
   if(req.params.id===req.user.id)return fail(res,400,"You cannot change your own role");
   if(!["admin","staff"].includes(req.body?.role))return fail(res,400,"Role must be admin or staff");
-  const {data,error}=await req.sb.from("profiles").update({role:req.body.role}).eq("id",req.params.id).select("id,full_name,role").single();
-  if(error)return dbError(res,error);res.json(data);
+  const {error}=await req.sb.rpc("set_bizinsight_user_role",{p_target_user_id:req.params.id,p_new_role:req.body.role});
+  if(error)return dbError(res,error);
+  const {data,profileError}=await req.sb.from("profiles").select("id,full_name,role").eq("id",req.params.id).single();
+  if(profileError)return dbError(res,profileError);res.json(data);
 }));
 
 app.use("/api",(_req,res)=>res.status(404).json({message:"API endpoint not found"}));
