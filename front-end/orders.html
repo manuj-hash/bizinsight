@@ -162,7 +162,7 @@ async function loadOrders(){
             };
             if(order.status==="pending"){addAction("Process","processing");addAction("Complete","completed");addAction("Cancel","cancelled");}
             if(order.status==="processing"){addAction("Complete","completed");addAction("Cancel","cancelled");}
-            if(order.status==="completed"||order.status==="cancelled") cell(row,"—");
+            if(order.status==="completed"||order.status==="cancelled") actions.textContent="—";
         });
     }catch(error){
         body.innerHTML='<tr><td colspan="6">Unable to load orders.</td></tr>';
