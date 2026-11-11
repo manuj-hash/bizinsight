@@ -5,6 +5,20 @@
 ALTER TABLE public.customers
   ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
 
+ALTER TABLE public.profiles
+  ALTER COLUMN role SET DEFAULT 'staff';
+
+-- Users may edit only their own profile's non-privileged fields. Role changes
+-- must go through the service-role RPC below; this prevents self-promotion.
+REVOKE UPDATE ON public.profiles FROM authenticated;
+GRANT UPDATE (full_name, phone) ON public.profiles TO authenticated;
+
+-- Orders and order items are read-only to authenticated API clients. Creation,
+-- status transitions and stock changes are performed by the protected RPCs.
+REVOKE INSERT, UPDATE, DELETE ON public.orders FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.order_items FROM authenticated;
+GRANT SELECT ON public.orders, public.order_items TO authenticated;
+
 CREATE TABLE IF NOT EXISTS public.inventory_movements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
@@ -396,6 +410,10 @@ DECLARE
   v_profile public.profiles%ROWTYPE;
   v_admin_count integer;
 BEGIN
+  -- Serialize all role changes so two concurrent demotions cannot remove
+  -- the last two administrators at the same time.
+  PERFORM pg_advisory_xact_lock(hashtext('bizinsight-admin-role-change'));
+
   IF p_role NOT IN ('admin', 'staff') THEN
     RAISE EXCEPTION 'Role must be admin or staff';
   END IF;
