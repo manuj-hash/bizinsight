@@ -7,13 +7,17 @@ if (!supabaseUrl || !publishableKey) {
     throw new Error("SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are required");
 }
 
-const authClient = createClient(supabaseUrl, publishableKey, {
-    auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
-    }
-});
+function createAuthClient() {
+    // Auth clients are request-scoped because signInWithPassword mutates the
+    // SDK's in-memory session. Never share that state across users.
+    return createClient(supabaseUrl, publishableKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false
+        }
+    });
+}
 
 // Every authenticated request gets its own client carrying that user's JWT.
 // This is essential: validating a token with auth.getUser() does not, by itself,
@@ -66,7 +70,7 @@ function getAdminClient() {
 }
 
 module.exports = {
-    authClient,
+    createAuthClient,
     createUserClient,
     getAdminClient
 };
