@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizInsight | Customers</title>
+    <link rel="stylesheet" href="inventory.css">
+</head>
+<body>
+<div class="sidebar">
+    <h2>BizInsight</h2>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
+    <a href="orders.html">Sales & Orders</a>
+    <a href="customers.html" class="active">Customers</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="reports.html">Reports</a>
+    <a href="profile.html">Profile</a>
+    <a href="index.html" class="lout" id="logoutLink">Logout</a>
+</div>
+<div class="main-content">
+<div class="container">
+    <h1>Customer Management</h1>
+    <p>Maintain customer details and connect customers with their sales history.</p>
+    <p id="message" role="status" aria-live="polite"></p>
+
+    <section class="form-container">
+        <h3 id="formTitle">Add Customer</h3>
+        <form id="customerForm">
+            <label for="customerName">Full name</label>
+            <input id="customerName" maxlength="150" required>
+            <label for="customerEmail">Email</label>
+            <input id="customerEmail" type="email" maxlength="254">
+            <label for="customerPhone">Phone</label>
+            <input id="customerPhone" type="tel" maxlength="30">
+            <label for="customerAddress">Address</label>
+            <textarea id="customerAddress" rows="2" maxlength="1000"></textarea>
+            <button type="submit" id="saveButton">Add Customer</button>
+            <button type="button" id="cancelButton" hidden>Cancel edit</button>
+        </form>
+    </section>
+
+    <section class="table-container">
+        <h3>Active Customers</h3>
+        <button type="button" id="refreshButton">Refresh</button>
+        <div style="overflow-x:auto">
+            <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
+                <tbody id="customersBody"><tr><td colspan="5">Loading customers...</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+</div>
+</div>
+<script>
+const API="/api";
+const token=()=>sessionStorage.getItem("bizinsight_token");
+let customers=[];
+let editingId=null;
+function headers(json=false){
+    if(!token()) throw new Error("Your session has expired. Please sign in again.");
+    const h={Authorization:"Bearer "+token()};
+    if(json) h["Content-Type"]="application/json";
+    return h;
+}
+function showMessage(message,error=false){
+    const el=document.getElementById("message");el.textContent=message;
+    el.style.color=error?"#b42318":"#16794b";
+}
+async function api(path,options={}){
+    const response=await fetch(API+path,{...options,headers:{...headers(Boolean(options.body)),...(options.headers||{})}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.message||"Request failed");
+    return data;
+}
+function cell(row,value){const td=row.insertCell();td.textContent=value==null?"—":String(value);return td;}
+async function loadCustomers(){
+    const body=document.getElementById("customersBody");
+    try{
+        const data=await api("/customers");
+        customers=(Array.isArray(data)?data:data.customers||[]).filter(c=>c.is_active!==false);
+        body.replaceChildren();
+        if(!customers.length){body.innerHTML='<tr><td colspan="5">No active customers yet.</td></tr>';return;}
+        customers.forEach(customer=>{
+            const row=body.insertRow();
+            cell(row,customer.name);cell(row,customer.email);cell(row,customer.phone);cell(row,customer.address);
+            const actions=row.insertCell();
+            const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";
+            edit.addEventListener("click",()=>editCustomer(customer.id));
+            const archive=document.createElement("button");archive.type="button";archive.textContent="Archive";
+            archive.addEventListener("click",()=>archiveCustomer(customer.id));
+            actions.append(edit,document.createTextNode(" "),archive);
+        });
+    }catch(error){body.innerHTML='<tr><td colspan="5">Unable to load customers.</td></tr>';showMessage(error.message,true);}
+}
+function editCustomer(id){
+    const customer=customers.find(item=>String(item.id)===String(id));
+    if(!customer)return showMessage("Customer not found.",true);
+    editingId=id;
+    document.getElementById("customerName").value=customer.name||"";
+    document.getElementById("customerEmail").value=customer.email||"";
+    document.getElementById("customerPhone").value=customer.phone||"";
+    document.getElementById("customerAddress").value=customer.address||"";
+    document.getElementById("formTitle").textContent="Edit Customer";
+    document.getElementById("saveButton").textContent="Save changes";
+    document.getElementById("cancelButton").hidden=false;
+    document.getElementById("customerForm").scrollIntoView({behavior:"smooth"});
+}
+function resetForm(){
+    editingId=null;document.getElementById("customerForm").reset();
+    document.getElementById("formTitle").textContent="Add Customer";
+    document.getElementById("saveButton").textContent="Add Customer";
+    document.getElementById("cancelButton").hidden=true;
+}
+async function archiveCustomer(id){
+    if(!confirm("Archive this customer? Existing order history will be preserved."))return;
+    try{
+        const result=await api("/customers/"+encodeURIComponent(id),{method:"DELETE"});
+        showMessage(result.message||"Customer archived.");
+        await loadCustomers();
+    }catch(error){showMessage(error.message,true);}
+}
+document.getElementById("customerForm").addEventListener("submit",async event=>{
+    event.preventDefault();
+    const payload={
+        name:document.getElementById("customerName").value.trim(),
+        email:document.getElementById("customerEmail").value.trim(),
+        phone:document.getElementById("customerPhone").value.trim(),
+        address:document.getElementById("customerAddress").value.trim()
+    };
+    if(!payload.name)return showMessage("Customer name is required.",true);
+    const button=document.getElementById("saveButton");button.disabled=true;
+    try{
+        const result=await api(editingId?"/customers/"+encodeURIComponent(editingId):"/customers",{
+            method:editingId?"PUT":"POST",body:JSON.stringify(payload)
+        });
+        showMessage(result.message||"Customer saved.");
+        resetForm();await loadCustomers();
+    }catch(error){showMessage(error.message,true);}
+    finally{button.disabled=false;}
+});
+document.getElementById("cancelButton").addEventListener("click",resetForm);
+document.getElementById("refreshButton").addEventListener("click",loadCustomers);
+document.getElementById("logoutLink").addEventListener("click",()=>{
+    sessionStorage.clear();localStorage.removeItem("bizinsight_token");localStorage.removeItem("bizinsight_user");
+});
+document.addEventListener("DOMContentLoaded",()=>{
+    if(!token()){window.location.href="index.html";return;}
+    loadCustomers();
+});
+</script>
+</body>
+</html>
