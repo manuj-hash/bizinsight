@@ -1,4 +1,4 @@
-const { authClient, createUserClient } = require("../config/supabase");
+const { createAuthClient, createUserClient } = require("../config/supabase");
 
 // Validate the bearer token, load the trusted database role, and attach a
 // request-scoped Supabase client so every query is evaluated under that user.
@@ -15,7 +15,7 @@ const protect = async (req, res, next) => {
         }
 
         const { data: authData, error: authError } =
-            await authClient.auth.getUser(token);
+            await createAuthClient().auth.getUser(token);
 
         if (authError || !authData.user) {
             return res.status(401).json({ message: "Invalid or expired token" });
