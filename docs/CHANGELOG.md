@@ -18,12 +18,12 @@ Baseline preserved at `baseline/original-2026-11-11`. Working changes isolated a
 - `backend/controllers/productController.js`: reject direct stock edits, use audited movement RPC for opening stock, archive products rather than hard-delete.
 - `backend/controllers/orderController.js`: use service-role RPC for order creation/status changes; cancellation restores stock; physical order deletion disabled.
 - `backend/controllers/customerController.js`: archive customers rather than hard-delete; active customer list.
-- `backend/controllers/analyticsController.js`: paginate table reads and exclude archived records from key totals.
+- `backend/controllers/analyticsController.js`: paginate table reads, calculate month boundaries in the configured business timezone, and distinguish inventory cost valuation from potential retail value.
 - `backend/controllers/userController.js`: use service-role role-change RPC, add last-admin-safe role update and verified password update.
 - Added `backend/controllers/inventoryMovementController.js` and `backend/routes/inventoryMovementRoutes.js`.
-- `backend/server.js`: mount inventory movement API and restrict cross-origin requests to configured origins.
+- `backend/server.js`: mount inventory movement API, restrict cross-origin requests to configured origins, and parse PORT as a numeric TCP port.
 - `backend/routes/userRoutes.js`: add password update route.
-- Added `backend/.env.example` and replaced temporary backend update notes with setup/security documentation.
+- Added `backend/.env.example` (including BUSINESS_TIME_ZONE) and replaced temporary backend update notes with setup/security documentation.
 
 ### Frontend files changed
 - Login now stores access tokens in tab-scoped session storage and clears legacy persistent tokens.
