@@ -1,4 +1,4 @@
-const { authClient, getAdminClient } = require("../config/supabase");
+const { createAuthClient, getAdminClient } = require("../config/supabase");
 
 const getUsers = async (req, res) => {
     try {
@@ -105,7 +105,7 @@ const updateMyPassword = async (req, res) => {
         // Verify the caller knows their current password before using the
         // server-only Auth Admin API to update their own account.
         const { data: verified, error: verifyError } =
-            await authClient.auth.signInWithPassword({
+            await createAuthClient().auth.signInWithPassword({
                 email: req.user.email,
                 password: currentPassword
             });
