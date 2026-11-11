@@ -58,19 +58,21 @@
 
 <script>
 
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "/api";
 const ANALYTICS_API = `${API_BASE}/analytics`;
 const SALES_API = `${ANALYTICS_API}/sales`;
 
 let salesChart = null;
 
 function getToken() {
-    return localStorage.getItem("bizinsight_token");
+    return sessionStorage.getItem("bizinsight_token");
 }
 
 function logout() {
     localStorage.removeItem("bizinsight_token");
+    sessionStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
+    sessionStorage.removeItem("bizinsight_user");
 }
 
 function showMessage(message, isError = false) {
