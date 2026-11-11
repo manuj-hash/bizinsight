@@ -1,186 +1,176 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BizInsight Profile</title>
+    <title>BizInsight | Profile</title>
     <link rel="stylesheet" href="profile.css">
+    <style>
+        .profile-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+        .profile-form{margin-top:20px;padding:20px;background:#f8fafc;border-radius:12px}
+        .profile-form[hidden]{display:none}
+        .profile-form label{display:block;margin:12px 0 6px;font-weight:600}
+        .profile-form input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px}
+        .profile-form button{margin-top:14px;padding:11px 16px;border:0;border-radius:8px;cursor:pointer}
+        .profile-card{width:min(100%,760px)}
+        @media(max-width:900px){body{display:block;padding:16px}.sidebar{position:relative;width:100%;height:auto}.main-content{margin:0;width:100%;padding:16px}.container{min-height:auto}.profile-card{padding:22px}}
+    </style>
 </head>
 <body>
-
 <div class="sidebar">
     <h2>BizInsight</h2>
-    <a href="dashboard.html">🏠 Dashboard</a>
-    <a href="inventory.html">📦 Inventory</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
     <a href="orders.html">Sales & Orders</a>
     <a href="customers.html">Customers</a>
-    <a href="analytics.html">📊 Analytics</a>
-    <a href="reports.html">📄 Reports</a>
-    <a href="profile.html" class="active">👤 Profile</a>
-    <a href="index.html" class="lout" onclick="logout()">🚪 Logout</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="reports.html">Reports</a>
+    <a href="profile.html" class="active">Profile</a>
+    <a href="index.html" class="lout" id="logoutLink">Logout</a>
 </div>
 
 <div class="main-content">
-    <div class="container">
-
-        <div class="profile-card">
-
-            <div id="message" role="status"></div>
-
-            <div class="profile-header">
-                <img id="profileImage"
-                     src="https://ui-avatars.com/api/?name=User&background=6a11cb&color=fff&size=256"
-                     alt="Profile Picture">
-
-                <div class="profile-text">
-                    <h2 id="profileName">Loading...</h2>
-                    <p id="profileRole">Loading profile...</p>
-                </div>
-            </div>
-
-            <div class="info">
-                <div class="row">
-                    <span>Full Name</span>
-                    <strong id="fullName">Loading...</strong>
-                </div>
-
-                <div class="row">
-                    <span>Email</span>
-                    <strong id="email">Loading...</strong>
-                </div>
-
-                <div class="row">
-                    <span>Phone</span>
-                    <strong id="phone">Not available</strong>
-                </div>
-
-                <div class="row">
-                    <span>Department</span>
-                    <strong id="department">Not available</strong>
-                </div>
-
-                <div class="row">
-                    <span>Role</span>
-                    <strong id="role">Loading...</strong>
-                </div>
-
-                <div class="row">
-                    <span>Last Login</span>
-                    <strong id="lastLogin">Not available</strong>
-                </div>
-            </div>
-
-            <button class="edit-btn" type="button"
-                    onclick="showMessage('Profile editing is not enabled yet.')">
-                Edit Profile
-            </button>
-
-            <button class="password-btn" type="button"
-                    onclick="showMessage('Password change is not enabled yet.')">
-                Change Password
-            </button>
-
+<div class="container">
+<div class="profile-card">
+    <div id="message" role="status" aria-live="polite"></div>
+    <div class="profile-header">
+        <img id="profileImage" src="https://ui-avatars.com/api/?name=BizInsight&background=6a11cb&color=fff&size=256" alt="Profile avatar">
+        <div class="profile-text">
+            <h2 id="profileName">Loading...</h2>
+            <p id="profileRole">Loading profile...</p>
         </div>
     </div>
+
+    <div class="info">
+        <div class="row"><span>Full name</span><strong id="fullName">—</strong></div>
+        <div class="row"><span>Email</span><strong id="email">—</strong></div>
+        <div class="row"><span>Phone</span><strong id="phone">—</strong></div>
+        <div class="row"><span>Role</span><strong id="role">—</strong></div>
+        <div class="row"><span>Member since</span><strong id="createdAt">—</strong></div>
+    </div>
+
+    <div class="profile-actions">
+        <button type="button" id="editProfileButton" class="edit-btn">Edit profile</button>
+        <button type="button" id="changePasswordButton" class="password-btn">Change password</button>
+    </div>
+
+    <form id="profileForm" class="profile-form" hidden>
+        <h3>Edit profile details</h3>
+        <label for="editName">Full name</label>
+        <input id="editName" maxlength="150" required>
+        <label for="editPhone">Phone</label>
+        <input id="editPhone" type="tel" maxlength="30">
+        <button type="submit">Save profile</button>
+        <button type="button" id="cancelProfileButton">Cancel</button>
+    </form>
+
+    <form id="passwordForm" class="profile-form" hidden>
+        <h3>Change password</h3>
+        <label for="currentPassword">Current password</label>
+        <input id="currentPassword" type="password" autocomplete="current-password" required>
+        <label for="newPassword">New password (minimum 8 characters)</label>
+        <input id="newPassword" type="password" minlength="8" autocomplete="new-password" required>
+        <label for="confirmPassword">Confirm new password</label>
+        <input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+        <button type="submit">Update password</button>
+        <button type="button" id="cancelPasswordButton">Cancel</button>
+    </form>
+</div>
+</div>
 </div>
 
 <script>
-const API_URL = "/api/auth/me";
+const API="/api";
+const token=()=>sessionStorage.getItem("bizinsight_token");
+let profileData=null;
 
-function getToken() {
-    return sessionStorage.getItem("bizinsight_token");
+function showMessage(message,error=false){
+    const box=document.getElementById("message");
+    box.textContent=message;
+    box.style.color=error?"#b42318":"#16794b";
 }
+function authHeaders(json=false){
+    if(!token())throw new Error("Your session has expired. Please sign in again.");
+    const headers={Authorization:"Bearer "+token()};
+    if(json)headers["Content-Type"]="application/json";
+    return headers;
+}
+async function api(path,options={}){
+    const response=await fetch(API+path,{...options,headers:{...authHeaders(Boolean(options.body)),...(options.headers||{})}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.message||"Request failed");
+    return data;
+}
+function displayProfile(data){
+    profileData={...data.profile,email:data.user?.email};
+    const name=profileData.full_name||"BizInsight User";
+    document.getElementById("profileName").textContent=name;
+    document.getElementById("profileRole").textContent=profileData.role==="admin"?"Business Administrator":"Business Staff";
+    document.getElementById("fullName").textContent=name;
+    document.getElementById("email").textContent=profileData.email||"—";
+    document.getElementById("phone").textContent=profileData.phone||"—";
+    document.getElementById("role").textContent=profileData.role||"—";
+    document.getElementById("createdAt").textContent=profileData.created_at?new Date(profileData.created_at).toLocaleDateString("en-IN"):"—";
+    document.getElementById("profileImage").src="https://ui-avatars.com/api/?name="+encodeURIComponent(name)+"&background=6a11cb&color=fff&size=256";
+    document.getElementById("editName").value=profileData.full_name||"";
+    document.getElementById("editPhone").value=profileData.phone||"";
+}
+async function loadProfile(){
+    if(!token()){window.location.href="index.html";return;}
+    try{
+        const data=await api("/auth/me");
+        displayProfile(data);
+        showMessage("Profile loaded.");
+    }catch(error){showMessage(error.message,true);}
+}
+document.getElementById("editProfileButton").addEventListener("click",()=>{
+    document.getElementById("profileForm").hidden=false;
+    document.getElementById("passwordForm").hidden=true;
+});
+document.getElementById("changePasswordButton").addEventListener("click",()=>{
+    document.getElementById("passwordForm").hidden=false;
+    document.getElementById("profileForm").hidden=true;
+});
+document.getElementById("cancelProfileButton").addEventListener("click",()=>document.getElementById("profileForm").hidden=true);
+document.getElementById("cancelPasswordButton").addEventListener("click",()=>document.getElementById("passwordForm").hidden=true);
 
-function logout() {
+document.getElementById("profileForm").addEventListener("submit",async event=>{
+    event.preventDefault();
+    try{
+        await api("/users/me",{method:"PUT",body:JSON.stringify({
+            full_name:document.getElementById("editName").value.trim(),
+            phone:document.getElementById("editPhone").value.trim()
+        })});
+        const data=await api("/auth/me");
+        displayProfile(data);
+        document.getElementById("profileForm").hidden=true;
+        showMessage("Profile updated successfully.");
+    }catch(error){showMessage(error.message,true);}
+});
+
+document.getElementById("passwordForm").addEventListener("submit",async event=>{
+    event.preventDefault();
+    const current=document.getElementById("currentPassword").value;
+    const next=document.getElementById("newPassword").value;
+    const confirm=document.getElementById("confirmPassword").value;
+    if(next.length<8)return showMessage("New password must contain at least 8 characters.",true);
+    if(next!==confirm)return showMessage("New password and confirmation do not match.",true);
+    try{
+        const result=await api("/users/me/password",{method:"PUT",body:JSON.stringify({
+            current_password:current,new_password:next
+        })});
+        showMessage(result.message||"Password updated.");
+        document.getElementById("passwordForm").reset();
+        sessionStorage.clear();
+        setTimeout(()=>window.location.href="index.html",1200);
+    }catch(error){showMessage(error.message,true);}
+});
+document.getElementById("logoutLink").addEventListener("click",()=>{
+    sessionStorage.clear();
     localStorage.removeItem("bizinsight_token");
-    sessionStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
-    sessionStorage.removeItem("bizinsight_user");
-}
-
-function showMessage(message, isError = false) {
-    const box = document.getElementById("message");
-    box.textContent = message;
-    box.style.color = isError ? "red" : "green";
-    box.style.margin = "12px 0";
-}
-
-function displayProfile(user) {
-    const name = user.name || "User";
-    const email = user.email || "Not available";
-    const role = user.role || "staff";
-    const phone = user.phone || "Not available";
-    const department = user.department || "Not available";
-
-    const lastLogin = user.lastLogin || user.last_login || "Not available";
-
-    document.getElementById("profileName").textContent = name;
-
-    document.getElementById("profileRole").textContent =
-        role.toLowerCase() === "admin"
-            ? "Business Administrator"
-            : "Business Staff";
-
-    document.getElementById("fullName").textContent = name;
-    document.getElementById("email").textContent = email;
-    document.getElementById("phone").textContent = phone;
-    document.getElementById("department").textContent = department;
-    document.getElementById("role").textContent = role;
-    document.getElementById("lastLogin").textContent = lastLogin;
-
-    const avatarName = encodeURIComponent(name);
-
-    document.getElementById("profileImage").src =
-        user.avatar ||
-        user.profileImage ||
-        `https://ui-avatars.com/api/?name=${avatarName}&background=6a11cb&color=fff&size=256`;
-}
-
-async function loadProfile() {
-    const token = getToken();
-
-    if (!token) {
-        showMessage("Session expired. Please login again.", true);
-        return;
-    }
-
-    try {
-        const response = await fetch(API_URL, {
-            method: "GET",
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || "Unable to load profile.");
-        }
-
-        const user = {
-            ...data.profile,
-            name: data.profile?.full_name,
-            email: data.user?.email
-        };
-
-        displayProfile(user);
-        showMessage("Profile loaded successfully.");
-
-    } catch (error) {
-        showMessage(error.message, true);
-
-        document.getElementById("profileName").textContent =
-            "Unable to load profile";
-
-        document.getElementById("profileRole").textContent =
-            "Please check your connection";
-    }
-}
-
-document.addEventListener("DOMContentLoaded", loadProfile);
+});
+document.addEventListener("DOMContentLoaded",loadProfile);
 </script>
-
 </body>
 </html>
