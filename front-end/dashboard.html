@@ -86,7 +86,7 @@
 
 const API_URL = "/api";
 
-// Use localStorage consistently across all pages
+// Use tab-scoped session storage consistently across all pages
 function getToken() {
     return sessionStorage.getItem("bizinsight_token");
 }
@@ -230,9 +230,9 @@ async function loadDashboard() {
             error.message.toLowerCase().includes("authentication")
         ) {
             localStorage.removeItem("bizinsight_token");
-    sessionStorage.removeItem("bizinsight_token");
+            sessionStorage.removeItem("bizinsight_token");
             localStorage.removeItem("bizinsight_user");
-    sessionStorage.removeItem("bizinsight_user");
+            sessionStorage.removeItem("bizinsight_user");
             window.location.href = "index.html";
         }
 
