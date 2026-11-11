@@ -212,5 +212,48 @@ revoke all on function public.transition_bizinsight_order(uuid,text) from public
 grant execute on function public.create_bizinsight_order_v2(text,uuid,jsonb,numeric,numeric) to authenticated;
 grant execute on function public.transition_bizinsight_order(uuid,text) to authenticated;
 
+
+-- Record the existing physical stock as an opening balance without changing it.
+insert into public.stock_movements(product_id,movement_type,quantity_delta,reference,event_key)
+select p.id,'opening_balance',p.stock_quantity,'Opening balance at ledger activation','opening:'||p.id::text
+from public.products p
+where p.stock_quantity > 0
+on conflict(event_key) do nothing;
+
+-- Controlled stock-in / return / damage / adjustment endpoint. No direct quantity edits.
+create or replace function public.adjust_bizinsight_stock(
+  p_product_id uuid,
+  p_quantity_delta integer,
+  p_movement_type text,
+  p_notes text default null
+) returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $
+declare
+  v_product public.products%rowtype;
+  v_next integer;
+begin
+  if not public.is_bizinsight_admin_or_staff() then raise exception 'Not authorised'; end if;
+  if p_quantity_delta = 0 then raise exception 'Quantity change cannot be zero'; end if;
+  if p_movement_type not in ('stock_in','return','damaged','adjustment') then
+    raise exception 'Unsupported manual stock movement';
+  end if;
+  select * into v_product from public.products where id=p_product_id and archived_at is null for update;
+  if not found then raise exception 'Product not found'; end if;
+  v_next := v_product.stock_quantity + p_quantity_delta;
+  if v_next < v_product.reserved_quantity then
+    raise exception 'Stock cannot be reduced below reserved quantity';
+  end if;
+  update public.products set stock_quantity=v_next,updated_at=now() where id=p_product_id;
+  insert into public.stock_movements(product_id,movement_type,quantity_delta,reserved_delta,notes,created_by)
+  values(p_product_id,p_movement_type,p_quantity_delta,0,p_notes,auth.uid());
+  return v_next;
+end;
+$;
+revoke all on function public.adjust_bizinsight_stock(uuid,integer,text,text) from public, anon;
+grant execute on function public.adjust_bizinsight_stock(uuid,integer,text,text) to authenticated;
+
 -- Keep the old service-role-only function for compatibility; new API must use v2.
 commit;
