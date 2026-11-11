@@ -196,7 +196,11 @@ BEGIN
 
   PERFORM set_config('bizinsight.allow_stock_change', 'true', true);
   PERFORM set_config('bizinsight.movement_type',
-    CASE WHEN p_quantity_delta > 0 THEN 'purchase' ELSE 'adjustment' END, true);
+    CASE
+      WHEN p_quantity_delta > 0 AND lower(btrim(p_reason)) LIKE 'opening stock%' THEN 'opening'
+      WHEN p_quantity_delta > 0 THEN 'purchase'
+      ELSE 'adjustment'
+    END, true);
   PERFORM set_config('bizinsight.movement_reason', btrim(p_reason), true);
   PERFORM set_config('bizinsight.reference_type', '', true);
   PERFORM set_config('bizinsight.reference_id', '', true);
@@ -278,6 +282,13 @@ BEGIN
 
     v_subtotal := v_subtotal + (v_product.price * v_quantity);
   END LOOP;
+
+  IF p_customer_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.customers
+    WHERE id = p_customer_id AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Customer not found or inactive';
+  END IF;
 
   IF v_discount > v_subtotal + v_tax THEN
     RAISE EXCEPTION 'Discount cannot exceed subtotal plus tax';
