@@ -1,0 +1,162 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, sans-serif;
+}
+.sidebar{
+    width:240px;
+    height:100vh;
+    background:linear-gradient(135deg,#0471ff,#83aaee);
+    color:white;
+    padding:30px 20px;
+    position:fixed;
+    left:0;
+    top:0;
+    overflow-y:auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar h2{
+    text-align:center;
+    margin-bottom:40px;
+    font-size:28px;
+}
+
+.sidebar a{
+    display:block;
+    color:white;
+    text-decoration:none;
+    padding:15px;
+    margin-bottom:10px;
+    border-radius:10px;
+    transition:0.3s;
+    font-size:17px;
+}
+
+.sidebar a:hover{
+    background:#dadadabc;
+    color:#0471ff;
+    transform:translateX(5px);
+}
+
+.sidebar a.active{
+    background:white;
+    color:#0471ff;
+    font-weight:bold;
+}
+.sidebar a.lout{
+    margin-top: auto;
+}
+.sidebar a.lout:hover{
+    box-shadow: red 0px 0px 10px;
+    background: none !important;
+    color: white !important;
+    transform: translateX(5px);
+}
+.main-content{
+    margin-left:260px;
+    width:calc(100% - 260px);
+    padding:30px;
+    min-height:100vh;
+}
+
+.container{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:calc(100vh - 60px);
+}
+
+body{
+    background:#f4f7fc;
+    display:flex;
+}
+.profile-card{
+    background:white;
+    max-width:700px;
+
+    padding:40px;
+    border-radius:20px;
+    box-shadow:0 5px 20px rgba(0,0,0,0.1);
+}
+
+.profile-header{
+    display:flex;
+    align-items:center;
+    gap:25px;
+    margin-bottom:30px;
+}
+
+.profile-header img{
+    width:75px;
+    height:75px;
+    border-radius:50%;
+    object-fit:cover;
+    border:4px solid #6a11cb;
+    background:#f0f0f0;
+}
+.profile-text{
+    display:flex;
+    flex-direction:column;
+}
+
+.profile-text h2{
+    color:#6a11cb;
+    font-size:32px;
+    margin-bottom:8px;
+}
+
+.profile-text p{
+    color:gray;
+    font-size:18px;
+}
+
+.info{
+    margin-bottom:25px;
+}
+
+.row{
+    display:flex;
+    justify-content:space-between;
+    padding:15px 0;
+    border-bottom:1px solid #ddd;
+}
+
+.row span{
+    color:#555;
+}
+
+.row strong{
+    color:#222;
+}
+
+.edit-btn,
+.password-btn{
+    width:45%;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    font-size:16px;
+    cursor:pointer;
+}
+
+.edit-btn{
+    background:#6a11cb;
+    color:white;
+}
+
+.password-btn{
+    background:#6c757d;
+    color:white;
+    font-size: 10px;
+}
+
+.edit-btn:hover{
+    background:#2575fc;
+}
+
+.password-btn:hover{
+    background:#555;
+}

@@ -1,0 +1,243 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizInsight Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>BizInsight</h2>
+    <a href="dashboard.html" class="active">🏠 Dashboard</a>
+    <a href="inventory.html">📦 Inventory</a>
+    <a href="analytics.html">📊 Analytics</a>
+    <a href="reports.html">📄 Reports</a>
+    <a href="profile.html">👤 Profile</a>
+    <a href="#" id="logoutButton" class="lout">🚪 Logout</a>
+</div>
+
+<div class="main-content">
+
+    <header>
+        <h1 id="welcomeHeading">Welcome to BizInsight</h1>
+        <p>Business Analytics & Decision Support System</p>
+    </header>
+
+    <p id="statusMessage">Loading dashboard data...</p>
+
+    <div class="cards">
+
+        <div class="card">
+            <h3>Total Products</h3>
+            <h2 id="totalProducts">--</h2>
+        </div>
+
+        <div class="card">
+            <h3>Low Stock Items</h3>
+            <h2 id="lowStock">--</h2>
+        </div>
+
+        <div class="card">
+            <h3>Total Revenue</h3>
+            <h2 id="totalRevenue">--</h2>
+        </div>
+
+        <div class="card">
+            <h3>Total Customers</h3>
+            <h2 id="totalCustomers">--</h2>
+        </div>
+
+        <div class="card">
+            <h3>Total Orders</h3>
+            <h2 id="totalOrders">--</h2>
+        </div>
+
+    </div>
+
+    <div class="inventory">
+        <h2>Inventory Overview</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+
+            <tbody id="inventoryTable">
+                <tr>
+                    <td colspan="4">Loading products...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+
+const API_URL = "http://localhost:3000/api";
+
+// Use localStorage consistently across all pages
+function getToken() {
+    return localStorage.getItem("bizinsight_token");
+}
+
+function getSavedUser() {
+    try {
+        return JSON.parse(localStorage.getItem("bizinsight_user") || "{}");
+    } catch {
+        return {};
+    }
+}
+
+const token = getToken();
+
+if (!token) {
+    window.location.href = "index.html";
+}
+
+const currentUser = getSavedUser();
+
+document.getElementById("welcomeHeading").textContent =
+    "Welcome Back, " +
+    (currentUser.full_name || currentUser.name || "User");
+
+// Logout
+document.getElementById("logoutButton").addEventListener("click", function(event) {
+    event.preventDefault();
+
+    localStorage.removeItem("bizinsight_token");
+    localStorage.removeItem("bizinsight_user");
+
+    window.location.href = "index.html";
+});
+
+// API request
+async function fetchAPI(endpoint) {
+
+    const response = await fetch(API_URL + endpoint, {
+        method: "GET",
+        headers: {
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json"
+        }
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+        throw new Error(result.message || "Unable to load data");
+    }
+
+    return result;
+}
+
+// Currency formatting
+function formatCurrency(amount) {
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2
+    }).format(Number(amount || 0));
+}
+
+// Load dashboard
+async function loadDashboard() {
+
+    const status = document.getElementById("statusMessage");
+
+    try {
+
+        const [analytics, inventory] = await Promise.all([
+            fetchAPI("/analytics"),
+            fetchAPI("/analytics/inventory")
+        ]);
+
+        // Dashboard statistics
+        document.getElementById("totalProducts").textContent =
+            analytics.totalProducts ?? 0;
+
+        document.getElementById("lowStock").textContent =
+            analytics.lowStockCount ?? 0;
+
+        document.getElementById("totalRevenue").textContent =
+            formatCurrency(analytics.totalSales);
+
+        document.getElementById("totalCustomers").textContent =
+            analytics.totalCustomers ?? 0;
+
+        document.getElementById("totalOrders").textContent =
+            analytics.totalOrders ?? 0;
+
+        // Inventory overview
+        const table = document.getElementById("inventoryTable");
+
+        table.replaceChildren();
+
+        const products = (inventory.products || []).slice(0, 8);
+
+        if (products.length === 0) {
+
+            const row = table.insertRow();
+            const cell = row.insertCell();
+
+            cell.colSpan = 4;
+            cell.textContent = "No products found.";
+
+        } else {
+
+            products.forEach(product => {
+
+                const row = table.insertRow();
+
+                const values = [
+                    product.name || "Unnamed",
+                    product.category || "-",
+                    product.stock_quantity ?? 0,
+                    formatCurrency(product.price)
+                ];
+
+                values.forEach(value => {
+
+                    const cell = row.insertCell();
+                    cell.textContent = value;
+
+                });
+
+            });
+        }
+
+        status.textContent =
+            "Live data loaded successfully from BizInsight backend.";
+
+    } catch (error) {
+
+        status.textContent = "Dashboard error: " + error.message;
+
+        if (
+            error.message.toLowerCase().includes("token") ||
+            error.message.toLowerCase().includes("authentication")
+        ) {
+            localStorage.removeItem("bizinsight_token");
+            localStorage.removeItem("bizinsight_user");
+            window.location.href = "index.html";
+        }
+
+    }
+}
+
+if (token) {
+    loadDashboard();
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,182 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizInsight Profile</title>
+    <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>BizInsight</h2>
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="inventory.html">📦 Inventory</a>
+    <a href="analytics.html">📊 Analytics</a>
+    <a href="reports.html">📄 Reports</a>
+    <a href="profile.html" class="active">👤 Profile</a>
+    <a href="index.html" class="lout" onclick="logout()">🚪 Logout</a>
+</div>
+
+<div class="main-content">
+    <div class="container">
+
+        <div class="profile-card">
+
+            <div id="message" role="status"></div>
+
+            <div class="profile-header">
+                <img id="profileImage"
+                     src="https://ui-avatars.com/api/?name=User&background=6a11cb&color=fff&size=256"
+                     alt="Profile Picture">
+
+                <div class="profile-text">
+                    <h2 id="profileName">Loading...</h2>
+                    <p id="profileRole">Loading profile...</p>
+                </div>
+            </div>
+
+            <div class="info">
+                <div class="row">
+                    <span>Full Name</span>
+                    <strong id="fullName">Loading...</strong>
+                </div>
+
+                <div class="row">
+                    <span>Email</span>
+                    <strong id="email">Loading...</strong>
+                </div>
+
+                <div class="row">
+                    <span>Phone</span>
+                    <strong id="phone">Not available</strong>
+                </div>
+
+                <div class="row">
+                    <span>Department</span>
+                    <strong id="department">Not available</strong>
+                </div>
+
+                <div class="row">
+                    <span>Role</span>
+                    <strong id="role">Loading...</strong>
+                </div>
+
+                <div class="row">
+                    <span>Last Login</span>
+                    <strong id="lastLogin">Not available</strong>
+                </div>
+            </div>
+
+            <button class="edit-btn" type="button"
+                    onclick="showMessage('Profile editing is not enabled yet.')">
+                Edit Profile
+            </button>
+
+            <button class="password-btn" type="button"
+                    onclick="showMessage('Password change is not enabled yet.')">
+                Change Password
+            </button>
+
+        </div>
+    </div>
+</div>
+
+<script>
+const API_URL = "http://localhost:3000/api/auth/me";
+
+function getToken() {
+    return localStorage.getItem("bizinsight_token");
+}
+
+function logout() {
+    localStorage.removeItem("bizinsight_token");
+    localStorage.removeItem("bizinsight_user");
+}
+
+function showMessage(message, isError = false) {
+    const box = document.getElementById("message");
+    box.textContent = message;
+    box.style.color = isError ? "red" : "green";
+    box.style.margin = "12px 0";
+}
+
+function displayProfile(user) {
+    const name = user.name || "User";
+    const email = user.email || "Not available";
+    const role = user.role || "staff";
+    const phone = user.phone || "Not available";
+    const department = user.department || "Not available";
+
+    const lastLogin = user.lastLogin || user.last_login || "Not available";
+
+    document.getElementById("profileName").textContent = name;
+
+    document.getElementById("profileRole").textContent =
+        role.toLowerCase() === "admin"
+            ? "Business Administrator"
+            : "Business Staff";
+
+    document.getElementById("fullName").textContent = name;
+    document.getElementById("email").textContent = email;
+    document.getElementById("phone").textContent = phone;
+    document.getElementById("department").textContent = department;
+    document.getElementById("role").textContent = role;
+    document.getElementById("lastLogin").textContent = lastLogin;
+
+    const avatarName = encodeURIComponent(name);
+
+    document.getElementById("profileImage").src =
+        user.avatar ||
+        user.profileImage ||
+        `https://ui-avatars.com/api/?name=${avatarName}&background=6a11cb&color=fff&size=256`;
+}
+
+async function loadProfile() {
+    const token = getToken();
+
+    if (!token) {
+        showMessage("Session expired. Please login again.", true);
+        return;
+    }
+
+    try {
+        const response = await fetch(API_URL, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Unable to load profile.");
+        }
+
+        const user = {
+            ...data.profile,
+            name: data.profile?.full_name,
+            email: data.user?.email
+        };
+
+        displayProfile(user);
+        showMessage("Profile loaded successfully.");
+
+    } catch (error) {
+        showMessage(error.message, true);
+
+        document.getElementById("profileName").textContent =
+            "Unable to load profile";
+
+        document.getElementById("profileRole").textContent =
+            "Please check your connection";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadProfile);
+</script>
+
+</body>
+</html>

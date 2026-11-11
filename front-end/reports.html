@@ -1,0 +1,397 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizInsight Reports</title>
+    <link rel="stylesheet" href="reports.css">
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>BizInsight</h2>
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="inventory.html">📦 Inventory</a>
+    <a href="analytics.html">📊 Analytics</a>
+    <a href="reports.html" class="active">📄 Reports</a>
+    <a href="profile.html">👤 Profile</a>
+    <a href="index.html" class="lout" onclick="logout()">🚪 Logout</a>
+</div>
+
+<div class="main-content">
+    <div class="container">
+
+        <h1>BizInsight Reports</h1>
+        <p>Generate and analyze your business performance reports</p>
+
+        <div id="message" role="status"></div>
+
+        <div class="report-cards">
+
+            <div class="card">
+                <h3>Sales Report</h3>
+                <h2 id="salesValue">Loading...</h2>
+                <p>Total sales from completed orders</p>
+                <button onclick="downloadSalesReport()">Download Report</button>
+            </div>
+
+            <div class="card">
+                <h3>Inventory Report</h3>
+                <h2 id="inventoryValue">Loading...</h2>
+                <p>Total Products Available</p>
+                <button onclick="downloadInventoryReport()">Download Report</button>
+            </div>
+
+            <div class="card">
+                <h3>Revenue Report</h3>
+                <h2 id="revenueValue">Loading...</h2>
+                <p>Total Revenue Generated</p>
+                <button onclick="downloadRevenueReport()">Download Report</button>
+            </div>
+
+        </div>
+
+        <div class="summary">
+            <h2>Business Summary</h2>
+            <button onclick="loadReports()">Refresh Reports</button>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Products</th>
+                        <th>Total Stock</th>
+                        <th>Stock Status</th>
+                    </tr>
+                </thead>
+                <tbody id="categoryTable">
+                    <tr>
+                        <td colspan="4">Loading data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+const API_BASE = "http://localhost:3000/api";
+
+const PRODUCTS_API = `${API_BASE}/products`;
+const ORDERS_API = `${API_BASE}/orders`;
+const ANALYTICS_API = `${API_BASE}/analytics`;
+
+let products = [];
+let orders = [];
+let analytics = {};
+
+function getToken() {
+    return localStorage.getItem("bizinsight_token");
+}
+
+function logout() {
+    localStorage.removeItem("bizinsight_token");
+    localStorage.removeItem("bizinsight_user");
+}
+
+function showMessage(message, isError = false) {
+    const box = document.getElementById("message");
+    box.textContent = message;
+    box.style.color = isError ? "red" : "green";
+    box.style.margin = "12px 0";
+}
+
+function getHeaders() {
+    const token = getToken();
+
+    if (!token) {
+        throw new Error("Please login first.");
+    }
+
+    return {
+        "Authorization": `Bearer ${token}`
+    };
+}
+
+async function fetchAPI(url) {
+    const response = await fetch(url, {
+        method: "GET",
+        headers: getHeaders()
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || "API request failed.");
+    }
+
+    return data;
+}
+
+function extractArray(data, keys) {
+    if (Array.isArray(data)) return data;
+
+    for (const key of keys) {
+        if (Array.isArray(data?.[key])) return data[key];
+    }
+
+    return [];
+}
+
+function formatCurrency(value) {
+    if (value === null || value === undefined ||
+        !Number.isFinite(Number(value))) {
+        return "—";
+    }
+
+    return Number(value).toLocaleString("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2
+    });
+}
+
+// Load reports
+async function loadReports() {
+    showMessage("Fetching business reports...");
+
+    try {
+        const results = await Promise.allSettled([
+            fetchAPI(PRODUCTS_API),
+            fetchAPI(ORDERS_API),
+            fetchAPI(ANALYTICS_API)
+        ]);
+
+        if (results[0].status === "fulfilled") {
+            products = extractArray(results[0].value, ["products"]);
+        } else {
+            products = [];
+        }
+
+        if (results[1].status === "fulfilled") {
+            orders = extractArray(results[1].value, ["orders"]);
+        } else {
+            orders = [];
+        }
+
+        if (results[2].status === "fulfilled") {
+            analytics = results[2].value;
+        } else {
+            analytics = {};
+        }
+
+        displaySalesReport();
+        displayInventoryReport();
+        displayRevenueReport();
+        displayCategoryReport();
+
+        const failed = results.filter(
+            result => result.status === "rejected"
+        );
+
+        if (failed.length > 0) {
+            showMessage(
+                `${failed.length} API request(s) failed. Some reports may be incomplete.`,
+                true
+            );
+        } else {
+            showMessage("Business reports loaded successfully.");
+        }
+
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// Sales report
+function getOrderAmount(order) {
+    return Number(order.total_amount || 0);
+}
+
+function displaySalesReport() {
+    const completedOrders = orders.filter(
+        order => order.status === "completed"
+    );
+
+    const totalSales = completedOrders.reduce(
+        (sum, order) => sum + getOrderAmount(order),
+        0
+    );
+
+    document.getElementById("salesValue").textContent =
+        formatCurrency(totalSales);
+}
+
+// Inventory report
+function displayInventoryReport() {
+    document.getElementById("inventoryValue").textContent =
+        products.length.toLocaleString("en-IN");
+}
+
+// Revenue report
+function displayRevenueReport() {
+    const revenue = analytics.totalSales;
+
+    document.getElementById("revenueValue").textContent =
+        revenue !== undefined && revenue !== null
+            ? formatCurrency(revenue)
+            : "—";
+}
+
+// Category report
+function displayCategoryReport() {
+    const categoryData = {};
+
+    products.forEach(product => {
+        const category = product.category || "Uncategorized";
+        const stock = Number(product.stock_quantity || 0);
+
+        if (!categoryData[category]) {
+            categoryData[category] = {
+                count: 0,
+                stock: 0
+            };
+        }
+
+        categoryData[category].count++;
+        categoryData[category].stock += stock;
+    });
+
+    const table = document.getElementById("categoryTable");
+    const categories = Object.entries(categoryData);
+
+    if (categories.length === 0) {
+        table.innerHTML = `
+            <tr>
+                <td colspan="4">No product data available.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    table.innerHTML = categories.map(([category, data]) => {
+        let status = "Good";
+
+        if (data.stock === 0) {
+            status = "Out of Stock";
+        } else if (data.stock <= 20) {
+            status = "Low Stock";
+        }
+
+        return `
+            <tr>
+                <td>${escapeHTML(category)}</td>
+                <td>${data.count}</td>
+                <td>${data.stock}</td>
+                <td>${status}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+// Escape HTML
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+    })[char]);
+}
+
+// CSV download
+function downloadCSV(filename, rows) {
+    if (!rows || rows.length === 0) {
+        showMessage("No data available to download.", true);
+        return;
+    }
+
+    const csv = rows.map(row =>
+        row.map(value =>
+            `"${String(value ?? "").replace(/"/g, '""')}"`
+        ).join(",")
+    ).join("\n");
+
+    const blob = new Blob(
+        ["\uFEFF" + csv],
+        { type: "text/csv;charset=utf-8;" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = filename;
+    link.click();
+
+    URL.revokeObjectURL(url);
+    showMessage(`${filename} downloaded successfully.`);
+}
+
+// Download sales
+function downloadSalesReport() {
+    const completedOrders = orders.filter(
+        order => order.status === "completed"
+    );
+
+    const rows = [
+        ["Order ID", "Amount", "Date", "Status"]
+    ];
+
+    completedOrders.forEach(order => {
+        rows.push([
+            order.id || "",
+            getOrderAmount(order),
+            order.ordered_at || "",
+            order.status || ""
+        ]);
+    });
+
+    downloadCSV("BizInsight_Sales_Report.csv", rows);
+}
+
+// Download inventory
+function downloadInventoryReport() {
+    const rows = [
+        ["Product", "SKU", "Category", "Stock", "Price"]
+    ];
+
+    products.forEach(product => {
+        rows.push([
+            product.name || "",
+            product.sku || "",
+            product.category || "",
+            Number(product.stock_quantity || 0),
+            product.price ?? 0
+        ]);
+    });
+
+    downloadCSV("BizInsight_Inventory_Report.csv", rows);
+}
+
+// Download revenue
+function downloadRevenueReport() {
+    const rows = [
+        ["Metric", "Value"],
+        ["Total Revenue", analytics.totalSales ?? 0]
+    ];
+
+    downloadCSV("BizInsight_Revenue_Report.csv", rows);
+}
+
+// Initialize
+document.addEventListener("DOMContentLoaded", function() {
+    if (!getToken()) {
+        showMessage("Session expired. Please login again.", true);
+        return;
+    }
+
+    loadReports();
+});
+</script>
+
+</body>
+</html>

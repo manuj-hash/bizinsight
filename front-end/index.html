@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BizInsight - Login</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-card h1 {
+            margin-bottom: 10px;
+        }
+
+        .login-card .subtitle {
+            margin-bottom: 25px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        .login-card input {
+            width: 100%;
+            margin-bottom: 18px;
+        }
+
+        .login-btn {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #loginMessage {
+            margin-top: 18px;
+            min-height: 22px;
+            font-size: 14px;
+            color: #d32f2f;
+        }
+
+        .brand {
+            font-size: 13px;
+            color: #777;
+            margin-top: 25px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="login-card">
+
+            <h1>BizInsight</h1>
+
+            <p class="subtitle">
+                Business Intelligence & Management System
+            </p>
+
+            <form id="loginForm">
+
+                <label for="email">Email Address</label>
+
+                <input
+                    type="email"
+                    id="email"
+                    placeholder="Enter your email"
+                    autocomplete="username"
+                    required
+                >
+
+                <label for="password">Password</label>
+
+                <input
+                    type="password"
+                    id="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+
+                <button
+                    type="submit"
+                    id="loginButton"
+                    class="login-btn"
+                >
+                    Sign In
+                </button>
+
+                <p id="loginMessage" role="status"></p>
+
+            </form>
+
+            <p class="brand">
+                © 2026 BizInsight. All rights reserved.
+            </p>
+
+        </div>
+
+    </div>
+
+    <script>
+
+        // Backend API URL
+        const API_URL = "/api";
+
+        // Get HTML elements
+        const loginForm = document.getElementById("loginForm");
+
+        const loginButton =
+            document.getElementById("loginButton");
+
+        const loginMessage =
+            document.getElementById("loginMessage");
+
+
+        // Login functionality
+        loginForm.addEventListener("submit", async function(event) {
+
+            event.preventDefault();
+
+            const email =
+                document.getElementById("email").value.trim();
+
+            const password =
+                document.getElementById("password").value;
+
+            loginButton.disabled = true;
+
+            loginButton.textContent = "Signing in...";
+
+            loginMessage.style.color = "#555";
+
+            loginMessage.textContent = "Please wait...";
+
+            try {
+
+                const response = await fetch(
+                    API_URL + "/auth/login",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            email: email,
+                            password: password
+                        })
+                    }
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.message || "Login failed"
+                    );
+
+                }
+
+                // Check server response
+                if (!data.token || !data.profile) {
+
+                    throw new Error(
+                        "Invalid response from server"
+                    );
+
+                }
+
+                // Save authentication details
+                localStorage.setItem(
+                    "bizinsight_token",
+                    data.token
+                );
+
+                localStorage.setItem(
+                    "bizinsight_user",
+                    JSON.stringify(data.profile)
+                );
+
+                sessionStorage.setItem(
+                    "bizinsight_token",
+                    data.token
+                );
+
+                sessionStorage.setItem(
+                    "bizinsight_user",
+                    JSON.stringify(data.profile)
+                );
+
+                loginMessage.style.color = "green";
+
+                loginMessage.textContent =
+                    "Login successful! Redirecting...";
+
+                // Redirect to dashboard
+                setTimeout(function() {
+
+                    window.location.href =
+                        "./dashboard.html";
+
+                }, 700);
+
+            }
+
+            catch(error) {
+
+                console.error("Login error:", error);
+
+                loginMessage.style.color = "red";
+
+                loginMessage.textContent =
+                    error.message ||
+                    "Unable to connect to the server.";
+
+                loginButton.disabled = false;
+
+                loginButton.textContent = "Sign In";
+
+            }
+
+        });
+
+    </script>
+
+</body>
+</html>
