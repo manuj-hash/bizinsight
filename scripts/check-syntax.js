@@ -30,15 +30,30 @@ walk(backendDir, file => file.endsWith(".js"));
 for (const file of fs.readdirSync(frontendDir).filter(name => name.endsWith(".html"))) {
     const fullPath = path.join(frontendDir, file);
     const html = fs.readFileSync(fullPath, "utf8");
-    const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
-    scripts.forEach((match, index) => {
-        if (match[1].trim()) checkJavaScript(fullPath + "#inline-script-" + (index + 1), match[1]);
-    });
+    let cursor = 0;
+    let scriptNumber = 0;
+
+    while (true) {
+        const start = html.indexOf("<script", cursor);
+        if (start === -1) break;
+        const tagEnd = html.indexOf(">", start);
+        const end = html.indexOf("</script>", tagEnd + 1);
+        if (tagEnd === -1 || end === -1) break;
+
+        const openingTag = html.slice(start, tagEnd + 1);
+        const source = html.slice(tagEnd + 1, end);
+        scriptNumber += 1;
+
+        if (!openingTag.includes("src=") && source.trim()) {
+            checkJavaScript(fullPath + "#inline-script-" + scriptNumber, source);
+        }
+        cursor = end + "</script>".length;
+    }
 }
 
 if (failures.length) {
-    process.stderr.write("\\nSyntax check failed for " + failures.length + " script(s).\\n");
+    process.stderr.write("\nSyntax check failed for " + failures.length + " script(s).\n");
     process.exitCode = 1;
 } else {
-    process.stdout.write("\\nAll backend and inline frontend scripts passed syntax parsing.\\n");
+    process.stdout.write("\nAll backend and inline frontend scripts passed syntax parsing.\n");
 }
