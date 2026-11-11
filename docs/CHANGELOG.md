@@ -47,7 +47,8 @@ Baseline preserved at `baseline/original-2026-11-11`. Working changes isolated a
 - Inspected source files from the original GitHub main branch.
 - Inspected live Supabase table definitions, applied migration history, RLS policies, and security/performance advisor results (read-only).
 - Parsed all current backend JavaScript files and inline scripts in login, dashboard, inventory, analytics, reports, profile, orders and customers using a JavaScript parser. All parsed successfully.
-- GitHub Actions workflow is configured to repeat syntax parsing on pushes and pull requests.
+- GitHub Actions workflow passes syntax checks for backend JavaScript and all inline frontend scripts. It also audits production dependencies on each push/PR.
+- The full dependency audit currently reports two moderate, fix-available development-tool findings (nodemon and its transitive minimatch dependency); no high or critical findings. Production-only audit is configured as a CI gate.
 - Full end-to-end runtime tests, browser interaction tests, SQL migration validation, and business-data tests remain pending.
 
 ### Remaining risks / next phase
