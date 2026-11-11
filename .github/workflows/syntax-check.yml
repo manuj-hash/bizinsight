@@ -18,6 +18,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci --prefix backend
       - run: node scripts/check-syntax.js
+      - name: Audit production dependencies
+        run: npm audit --prefix backend --omit=dev --audit-level=moderate
       - name: Report dependency audit summary
         continue-on-error: true
         run: |
