@@ -28,6 +28,7 @@ npm.cmd start
 - `SUPABASE_PUBLISHABLE_KEY`: publishable key used for login and user-scoped requests.
 - `SUPABASE_SECRET_KEY`: server-only secret key used for Auth Admin and privileged transactional RPCs. Never expose it to the browser.
 - `PORT`: optional HTTP port (default 3000).
+- `BUSINESS_TIME_ZONE`: IANA timezone used for monthly sales calculations (default `Asia/Kolkata`).
 - `CORS_ORIGINS`: optional comma-separated list of separately hosted frontend origins.
 
 ## Security model
