@@ -161,7 +161,7 @@ const setResponsibility=async(req,res)=>{
         const {department_id,primary_user_id,backup_user_id,activate_backup=false}=req.body;
         if(!department_id||!primary_user_id||!backup_user_id||primary_user_id===backup_user_id)
             return res.status(400).json({message:"Department, primary and backup members are required"});
-        if(req.profile.role!=="admin"&&department_id!==req.profile.department_id)
+        if(req.profile.role==="manager"&&req.profile.manager_scope==="department"&&department_id!==req.profile.department_id)
             return res.status(403).json({message:"You can manage responsibility only for your department"});
         const db=getAdminClient();
         const ids=[primary_user_id,backup_user_id];
@@ -184,7 +184,7 @@ const listResponsibilities=async(req,res)=>{
     try{
         if(!has(req,"communication.responsibility.manage")&&!has(req,"communication.general.publish"))return res.status(403).json({message:"Responsibility view is not granted"});
         let query=getAdminClient().from("communication_responsibilities").select("*");
-        if(req.profile.role!=="admin")query=query.eq("department_id",req.profile.department_id);
+        if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("department_id",req.profile.department_id);
         const {data,error}=await query;if(error)throw error;return res.json(data||[]);
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
 };
@@ -215,9 +215,13 @@ const listComplaintTargets=async(req,res)=>{
 
 const listAnnouncementDepartments=async(req,res)=>{
     try{
-        if(!has(req,"communication.general.publish"))return res.status(403).json({message:"General announcement publishing is not granted"});
-        const {data,error}=await getAdminClient().from("departments").select("id,name").eq("is_active",true).order("name");
-        if(error)throw error;return res.json(data||[]);
+        if(!has(req,"communication.general.publish")&&!has(req,"communication.responsibility.manage"))
+            return res.status(403).json({message:"General announcement or responsibility access is not granted"});
+        let query=getAdminClient().from("departments").select("id,name").eq("is_active",true).order("name");
+        if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("id",req.profile.department_id);
+        const {data,error}=await query;
+        if(error)throw error;
+        return res.json(data||[]);
     }catch(error){return res.status(500).json({message:"Unable to load announcement departments"});}
 };
 
