@@ -53,10 +53,18 @@
 - Existing row counts remain: profiles 3, products 2, inventory movements 1, orders 1, order items 1, customers 0, departments 0, messages 0, issues 0, communication notifications 0.
 - GitHub Actions syntax check, npm ci and production dependency audit passed for commit `6f932ea`.
 
+## Additional application integration work completed
+
+- Access Control page now loads the existing shared application stylesheet (the previous `staff.css` path did not exist).
+- Employee Edit controls are explicitly marked and visibility is governed by `staff.manage`, not generic inventory/order edit permissions.
+- If the Auth invitation succeeds but employee role/scope assignment fails, the backend attempts to delete the pending Auth user to avoid an orphan account.
+- Added Node built-in security/integration contract tests and wired them into GitHub Actions.
+- Latest CI run: [Run 43279180595](https://github.com/manuj-hash/bizinsight/actions/runs/43279180595) — dependency install, 7 contract tests, backend/inline-frontend JavaScript syntax checks, and production dependency audit all passed.
+
 ## Remaining verification
 
 1. Enable leaked-password protection in Supabase Auth settings and test login/password change flows.
-2. Run real sign-in/API tests for Admin and Staff. No Manager profile currently exists, so company-Manager and department-Manager workflows need a dedicated test account before they can be verified end-to-end.
+2. Run real sign-in/API and browser tests for Admin and Staff. No Manager profile or departments currently exist, so company-Manager and department-Manager workflows need test accounts and departments before they can be verified end-to-end.
 3. Run browser-level smoke tests for dashboard, inventory, orders, customers, analytics, reports, staff management, permissions, communication, complaints and notifications.
 4. Review 11 Supabase INFO findings for RLS-enabled server-only tables with no policies. These tables intentionally have no anon/authenticated grants and are accessed by the trusted service-role backend only.
 5. Reassess unused-index INFO findings after the application has real query traffic; do not remove indexes based only on a low-traffic advisor snapshot.
