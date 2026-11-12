@@ -64,7 +64,7 @@ const addProduct = async (req, res) => {
         }
 
         // Create with zero stock. Opening stock is added through the audited RPC.
-        const { data: product, error } = await req.supabase
+        const { data: product, error } = await getAdminClient()
             .from("products")
             .insert([{
                 sku: sku.trim(),
@@ -163,7 +163,7 @@ const updateProduct = async (req, res) => {
             return res.status(400).json({ message: "No valid product fields provided" });
         }
 
-        const { data, error } = await req.supabase
+        const { data, error } = await getAdminClient()
             .from("products")
             .update(updates)
             .eq("id", req.params.id)
