@@ -60,7 +60,16 @@ const createMessage = async (req,res) => {
             sender_id:req.user.id,title:title.trim(),body:body.trim(),priority
         }).select().single();
         if(error)throw error;
-        return res.status(201).json({message:"Message published",item:data});
+        const recipients=message_type==="team"?[departmentId]:target_department_ids;
+        const {data:people,error:peopleError}=await db.from("profiles").select("id").in("department_id",recipients);
+        if(peopleError)throw peopleError;
+        const notifications=(people||[]).filter(p=>p.id!==req.user.id).map(p=>({
+            user_id:p.id,message_id:data.id,
+            notification_type:message_type==="team"?"team_message":"general_announcement",
+            title:data.title
+        }));
+        if(notifications.length){const saved=await db.from("communication_notifications").insert(notifications);if(saved.error)throw saved.error;}
+        return res.status(201).json({message:"Message published and recipients notified",item:data});
     }catch(error){console.error("Create message:",error.message);return res.status(400).json({message:error.message||"Unable to publish message"});}
 };
 
@@ -89,7 +98,15 @@ const createIssue=async(req,res)=>{
             department_id,affected_department_ids,created_by:req.user.id,title:title.trim(),
             description:description.trim(),priority
         }).select().single();
-        if(error)throw error;return res.status(201).json({message:"Work issue reported",issue:data});
+        if(error)throw error;
+        const recipientDepartments=[department_id,...affected_department_ids];
+        const {data:people,error:peopleError}=await getAdminClient().from("profiles").select("id").in("department_id",recipientDepartments);
+        if(peopleError)throw peopleError;
+        const notifications=(people||[]).filter(p=>p.id!==req.user.id).map(p=>({
+            user_id:p.id,issue_id:data.id,notification_type:"work_issue",title:data.title
+        }));
+        if(notifications.length){const saved=await getAdminClient().from("communication_notifications").insert(notifications);if(saved.error)throw saved.error;}
+        return res.status(201).json({message:"Work issue reported and relevant teams notified",issue:data});
     }catch(error){console.error("Create issue:",error.message);return res.status(400).json({message:error.message||"Unable to report issue"});}
 };
 
@@ -173,4 +190,22 @@ const listResponsibilities=async(req,res)=>{
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
 };
 
-module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities};
+const listNotifications=async(req,res)=>{
+    try{
+        const {data,error}=await getAdminClient().from("communication_notifications")
+            .select("id,notification_type,title,message_id,issue_id,created_at,read_at")
+            .eq("user_id",req.user.id).order("created_at",{ascending:false}).limit(100);
+        if(error)throw error;return res.json(data||[]);
+    }catch(error){console.error("Notifications:",error.message);return res.status(500).json({message:"Unable to load notifications"});}
+};
+const markNotificationRead=async(req,res)=>{
+    try{
+        const {data,error}=await getAdminClient().from("communication_notifications")
+            .update({read_at:new Date().toISOString()}).eq("id",req.params.id).eq("user_id",req.user.id)
+            .select("id,read_at").maybeSingle();
+        if(error)throw error;if(!data)return res.status(404).json({message:"Notification not found"});
+        return res.json({message:"Notification marked as read",notification:data});
+    }catch(error){return res.status(400).json({message:"Unable to update notification"});}
+};
+
+module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead};
