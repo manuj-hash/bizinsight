@@ -4,7 +4,7 @@ const protect=require("../middleware/authMiddleware");
 const requirePermission=protect.requirePermission;
 const staff=require("../controllers/staffController");
 router.use(protect);
-router.get("/",requirePermission("staff.view"),staff.getStaff);
+router.get("/",requirePermission("staff.view","staff.manage"),staff.getStaff);
 router.post("/invite",requirePermission("staff.manage"),staff.inviteEmployee);
 router.put("/:id/compensation",requirePermission("staff.compensation.manage"),staff.updateCompensation);
 router.get("/departments",requirePermission("staff.view","staff.manage"),staff.getDepartments);
