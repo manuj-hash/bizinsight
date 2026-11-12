@@ -42,7 +42,8 @@ function renderPermissions(){
 }
 function renderDelegations(){
  const host=$("delegationList");host.replaceChildren();
- if(me.role!=="admin"){$("delegationCard").hidden=true;return;}
+ if(me.role!=="admin"||selectedEmployee?.role!=="manager"){$("delegationCard").hidden=true;return;}
+ $("delegationCard").hidden=false;
  const current=new Map(delegations.filter(d=>d.is_active&&d.manager_id===$("employee").value).map(d=>[d.permission_code,d]));
  catalog.forEach(p=>{
   const row=document.createElement("div");row.className="permission-row";
