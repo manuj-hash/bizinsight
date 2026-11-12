@@ -27,7 +27,7 @@ BEGIN
           AND i.indpred IS NULL
           AND i.indexprs IS NULL
           AND i.indnkeyatts >= cardinality(c.conkey)
-          AND i.indkey::smallint[] [0:cardinality(c.conkey)-1] = c.conkey
+          AND (SELECT array_agg(i.indkey[k]::smallint ORDER BY k)\n               FROM generate_series(0, cardinality(c.conkey)-1) AS g(k)) = c.conkey
       )
   LOOP
     SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ordinality)
