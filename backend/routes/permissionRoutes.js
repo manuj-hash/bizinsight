@@ -7,6 +7,8 @@ const management=require("../controllers/permissionManagementController");
 
 router.use(protect);
 router.get("/me",permissions.catalog);
+router.get("/notifications",permissions.listAccessNotifications);
+router.patch("/notifications/:notificationId/read",permissions.markAccessNotificationRead);
 router.get("/delegations",allowRoles("admin","manager"),permissions.getDelegations);
 router.put("/delegations",allowRoles("admin"),permissions.setDelegation);
 router.get("/users/:id",allowRoles("admin","manager"),requirePermission("staff.view"),management.getStaffPermissions);
