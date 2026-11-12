@@ -87,7 +87,7 @@ const listIssues = async(req,res)=>{
         const db=getAdminClient();
         let query=db.from("communication_issues").select("*").order("created_at",{ascending:false}).limit(200);
         if(req.profile.role==="staff")query=query.or(`department_id.eq.${req.profile.department_id},assigned_to.eq.${req.user.id}`);
-        else if(req.profile.role==="staff"||(req.profile.role==="manager"&&req.profile.manager_scope==="department"))query=query.eq("department_id",req.profile.department_id);
+        else if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("department_id",req.profile.department_id);
         const {data,error}=await query;if(error)throw error;return res.json(data||[]);
     }catch(error){console.error("Issues:",error.message);return res.status(500).json({message:"Unable to load work issues"});}
 };
@@ -127,7 +127,17 @@ const updateIssue=async(req,res)=>{
         if(!canSeeDepartment(req.profile,issue.department_id))return res.status(403).json({message:"Issue is outside your department"});
         const updates={updated_at:new Date().toISOString()};
         if(req.body.status!==undefined)updates.status=req.body.status;
-        if(req.body.assigned_to!==undefined)updates.assigned_to=req.body.assigned_to||null;
+        if(req.body.assigned_to!==undefined){
+            const assigneeId=req.body.assigned_to||null;
+            if(assigneeId){
+                const {data:assignee,error:assigneeError}=await db.from("profiles")
+                    .select("id,role,department_id").eq("id",assigneeId).maybeSingle();
+                if(assigneeError)throw assigneeError;
+                if(!assignee||!["staff","manager"].includes(assignee.role)||assignee.department_id!==issue.department_id)
+                    return res.status(400).json({message:"Choose a Staff member or Manager from the issue department"});
+            }
+            updates.assigned_to=assigneeId;
+        }
         if(req.body.status==="resolved"||req.body.status==="closed")updates.resolved_at=new Date().toISOString();
         const {data,error}=await db.from("communication_issues").update(updates).eq("id",req.params.id).select().single();
         if(error)throw error;return res.json({message:"Work issue updated",issue:data});
