@@ -85,6 +85,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS manager_delegations_one_active_uidx
 CREATE INDEX IF NOT EXISTS manager_delegations_manager_active_idx
   ON public.manager_delegations(manager_id,is_active);
 
+CREATE TABLE IF NOT EXISTS public.permission_audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  target_user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  permission_code text NOT NULL REFERENCES public.permission_catalog(code) ON DELETE RESTRICT,
+  action text NOT NULL CHECK (action IN ('grant','revoke','delegate','undelegate')),
+  details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS permission_audit_logs_target_date_idx
+  ON public.permission_audit_logs(target_user_id,created_at DESC);
+
 CREATE TABLE IF NOT EXISTS public.communication_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   message_type text NOT NULL CHECK (message_type IN ('team','general')),
@@ -166,7 +178,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'permission_catalog','user_permissions','manager_delegations',
+    'permission_catalog','user_permissions','manager_delegations','permission_audit_logs',
     'communication_messages','communication_issues','communication_complaints',
     'communication_complaint_responses','communication_responsibilities'
   ] LOOP
