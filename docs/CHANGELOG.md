@@ -57,3 +57,12 @@ Baseline preserved at `baseline/original-2026-11-11`. Working changes isolated a
 - Run the backend locally and verify login, products, stock movements, order creation, cancellation/restock, customer archive, role changes and password changes against the intended Supabase project.
 - Enable Supabase leaked-password protection in Auth settings.
 - Build payment lifecycle, invoice/receipt generation, returns/refunds, supplier/purchase workflow, advanced reports, and predictive decision support after core transactions pass testing.
+
+## 2026-11-12 — Review continuation and safety corrections
+
+- Reconfirmed the protected original baseline branch: `baseline/original-2026-11-11` (original main snapshot `0b8a8248c69bcee85eda958fa48501b76168ae69`). All current implementation work remains isolated on `improvements/phase-1`; no changes were made to `main` or the live Supabase database.
+- Hardened Supabase client separation: public sign-in uses the publishable key, protected requests use a request-scoped client carrying the caller JWT for RLS, and Auth Admin / service-role RPC operations use a server-only secret-key client. Supports the current `SUPABASE_SECRET_KEY` name and the legacy `SUPABASE_SERVICE_ROLE_KEY` fallback.
+- Restored the profile password-change endpoint and routed role changes through the serialized database RPC, including last-administrator protection.
+- Corrected the archive-trigger function's PL/pgSQL dollar-quote delimiter and wrapped migration 002 in a transaction.
+- Verification to date: reviewed all backend controllers/routes, the primary frontend pages, project baseline notes and proposed migration; confirmed no frontend `localhost:3000` hardcoding in the reviewed pages; confirmed baseline and implementation branches exist. Automated syntax/CI, SQL execution, browser flows and live database integration are still pending.
+- Do not apply migration 002 or deploy until its SQL has been independently validated, the target Supabase project has been backed up, and the user explicitly approves the database change.
