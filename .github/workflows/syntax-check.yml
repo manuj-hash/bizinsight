@@ -2,7 +2,7 @@ name: BizInsight syntax checks
 
 on:
   push:
-    branches: [main, improvements/phase-1]
+    branches: [main, improvements/phase-1, fix/permission-boundary-and-integration]
   pull_request:
     branches: [main]
 
