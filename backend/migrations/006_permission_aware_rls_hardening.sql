@@ -129,6 +129,8 @@ CREATE POLICY "Permissioned users read order items"
   USING (
     private.has_bizinsight_permission('orders.view')
     OR private.has_bizinsight_permission('reports.view')
+    OR private.has_bizinsight_permission('analytics.view')
+    OR private.has_bizinsight_permission('dashboard.view')
   );
 
 GRANT SELECT ON public.orders, public.order_items TO authenticated;
@@ -144,6 +146,7 @@ CREATE POLICY "Permissioned users read valuable customers"
     AND (
       private.has_bizinsight_permission('customers.view')
       OR private.has_bizinsight_permission('orders.view')
+      OR private.has_bizinsight_permission('orders.create')
       OR private.has_bizinsight_permission('reports.view')
       OR private.has_bizinsight_permission('analytics.view')
       OR private.has_bizinsight_permission('dashboard.view')
