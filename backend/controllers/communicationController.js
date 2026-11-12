@@ -53,7 +53,13 @@ const createMessage = async (req,res) => {
             }
             if(!Array.isArray(target_department_ids)||!target_department_ids.length)
                 return res.status(400).json({message:"Select at least one receiving department"});
-            
+            const uniqueTargets=[...new Set(target_department_ids)];
+            const {data:validTargets,error:targetError}=await db.from("departments").select("id")
+                .in("id",uniqueTargets).eq("is_active",true);
+            if(targetError)throw targetError;
+            if((validTargets||[]).length!==uniqueTargets.length)
+                return res.status(400).json({message:"One or more receiving departments are invalid or inactive"});
+            req.body.target_department_ids=uniqueTargets;
         }
         if(typeof title!=="string"||title.trim().length<2||typeof body!=="string"||body.trim().length<2)
             return res.status(400).json({message:"A title and message are required"});
