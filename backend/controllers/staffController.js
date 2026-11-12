@@ -31,6 +31,9 @@ const getStaff = async (req, res) => {
         if (departmentError) throw departmentError;
 
         const staffRows = staff || [];
+        const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        if (authUsersError) throw authUsersError;
+        const emailById = new Map((authUsers.users || []).map(user => [user.id, user.email || null]));
         const ids = staffRows.map(person => person.id);
         let compensation = [];
         if (ids.length) {
@@ -46,6 +49,7 @@ const getStaff = async (req, res) => {
         const salaryMap = new Map(compensation.map(item => [item.profile_id, item]));
         return res.json(staffRows.map(person => ({
             ...person,
+            email: emailById.get(person.id) || null,
             department_name: departmentMap.get(person.department_id) || null,
             compensation: salaryMap.get(person.id) || null
         })));
