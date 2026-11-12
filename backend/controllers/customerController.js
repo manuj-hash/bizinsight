@@ -2,9 +2,14 @@ const { getAdminClient } = require("../config/supabase");
 
 const getCustomers = async (req, res) => {
     try {
-        const { data, error } = await req.supabase
+        const fullAccess = req.profile.role === "admin" || (req.permissions &&
+            (req.permissions.has("customers.view") || req.permissions.has("reports.view")));
+        const columns = fullAccess
+            ? "id,name,email,phone,address,qualification_reason,order_count,lifetime_value,created_at"
+            : "id,name,email,phone,address";
+        const { data, error } = await getAdminClient()
             .from("customers")
-            .select("id,name,email,phone,address,qualification_reason,order_count,lifetime_value,created_at")
+            .select(columns)
             .eq("is_valuable", true)
             .eq("is_active", true)
             .order("lifetime_value", { ascending: false });
@@ -18,9 +23,14 @@ const getCustomers = async (req, res) => {
 
 const getCustomer = async (req, res) => {
     try {
-        const { data, error } = await req.supabase
+        const fullAccess = req.profile.role === "admin" || (req.permissions &&
+            (req.permissions.has("customers.view") || req.permissions.has("reports.view")));
+        const columns = fullAccess
+            ? "id,name,email,phone,address,qualification_reason,order_count,lifetime_value,created_at"
+            : "id,name,email,phone,address";
+        const { data, error } = await getAdminClient()
             .from("customers")
-            .select("id,name,email,phone,address,qualification_reason,order_count,lifetime_value,created_at")
+            .select(columns)
             .eq("id", req.params.id)
             .eq("is_valuable", true)
             .maybeSingle();
