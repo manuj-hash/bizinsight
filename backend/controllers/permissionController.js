@@ -122,7 +122,7 @@ const changeStaffPermission = async (req, res) => {
         ]);
         if (targetError) throw targetError;
         if (definitionError) throw definitionError;
-        if (!target || target.role !== "staff") return res.status(403).json({ message: "Managers can only manage Staff permissions. Admin accounts and Manager accounts are protected." });
+        if (!target || target.role === "admin" || (req.profile.role === "manager" && target.role !== "staff")) return res.status(403).json({ message: "Managers can only manage Staff permissions. Admin accounts and Manager accounts are protected." });
         if (!definition) return res.status(400).json({ message: "Unknown permission" });
         if (!(await canManagerChange(db, req.profile, target, permission_code, action))) {
             return res.status(403).json({ message: "You have not been delegated authority to perform this permission change for this Staff member" });
