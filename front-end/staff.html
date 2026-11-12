@@ -45,7 +45,7 @@
 <div><label for="email">Work email</label><input id="email" type="email" maxlength="254" required></div>
 <div><label for="phone">Phone</label><input id="phone" type="tel" maxlength="30"></div>
 <div><label for="role">Role</label><select id="role"><option value="staff">General Staff</option><option value="manager" id="managerOption">Manager</option></select></div>
-<div><label for="department">Department</label><select id="department" required><option value="">Select department</option></select></div>
+<div id="departmentWrap"><label for="department">Department</label><select id="department" required><option value="">Select department</option></select></div>
 <div><label for="designation">Designation</label><input id="designation" maxlength="100" placeholder="e.g. Sales Executive"></div>
 <div id="managerScopeWrap"><label for="managerScope">Manager scope</label><select id="managerScope"><option value="company">Overall Manager — all departments</option><option value="department">Department Manager</option></select></div>
 <div id="reportsToWrap" class="hidden"><label for="reportsTo">Reports to</label><select id="reportsTo"><option value="">Overall Manager</option></select></div>
@@ -145,24 +145,28 @@ async function loadStaff(){
 function editEmployee(person){
  const role=prompt("Role: staff or manager",person.role);
  if(role===null)return;
- const departmentName=prompt("Enter exact department name",person.department_name||"");
- if(departmentName===null)return;
- const dept=departments.find(d=>d.name.toLowerCase()===departmentName.trim().toLowerCase());
- if(!dept)return showMessage("Department not found. Create it first.",true);
- const designation=prompt("Designation",person.designation||"");
- if(designation===null)return;
  let managerScope=null,reportsTo=null;
  if(role.trim()==="manager"&&me.role==="admin"){
    managerScope=prompt("Manager scope: company or department",person.manager_scope||"department");
    if(managerScope===null)return;
-   if(managerScope==="department"){
-     const overall=staff.find(x=>x.role==="manager"&&x.manager_scope==="company");
-     reportsTo=overall?.id||null;
-     if(!reportsTo)return showMessage("Appoint an Overall Manager first.",true);
-   }
  }
+ let departmentId=null;
+ if(!(role.trim()==="manager"&&managerScope==="company")){
+   const departmentName=prompt("Enter exact department name",person.department_name||"");
+   if(departmentName===null)return;
+   const dept=departments.find(d=>d.name.toLowerCase()===departmentName.trim().toLowerCase());
+   if(!dept)return showMessage("Department not found. Create it first.",true);
+   departmentId=dept.id;
+ }
+ if(role.trim()==="manager"&&managerScope==="department"){
+   const overall=staff.find(x=>x.role==="manager"&&x.manager_scope==="company");
+   reportsTo=overall?.id||null;
+   if(!reportsTo)return showMessage("Appoint an Overall Manager first.",true);
+ }
+ const designation=prompt("Designation",person.designation||"");
+ if(designation===null)return;
  api("/staff/"+encodeURIComponent(person.id),{method:"PATCH",body:JSON.stringify({
-   role:role.trim(),department_id:managerScope==="company"?null:dept.id,designation,
+   role:role.trim(),department_id:departmentId,designation,
    manager_scope:managerScope,reports_to:reportsTo
  })}).then(async r=>{showMessage(r.message);await loadStaff();}).catch(e=>showMessage(e.message,true));
 }
@@ -181,9 +185,12 @@ async function setSalary(person){
 }
 function updateRoleControls(){
  const isAdmin=me.role==="admin";
+ const isCompanyManager=$("role").value==="manager"&&$("managerScope").value==="company";
  $("managerOption").hidden=!isAdmin;
  $("managerScopeWrap").classList.toggle("hidden",!isAdmin||$("role").value!=="manager");
  $("reportsToWrap").classList.toggle("hidden",!isAdmin||$("role").value!=="manager"||$("managerScope").value!=="department");
+ $("departmentWrap").classList.toggle("hidden",isCompanyManager);
+ $("department").required=!isCompanyManager;
 }
 $("role").addEventListener("change",updateRoleControls);
 $("managerScope").addEventListener("change",updateRoleControls);
