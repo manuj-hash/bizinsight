@@ -4,7 +4,7 @@ const getCustomers = async (req, res) => {
     try {
         const { data, error } = await req.supabase
             .from("customers")
-            .select("id,name,email,phone,address,qualification_reason,completed_order_count,lifetime_value,created_at")
+            .select("id,name,email,phone,address,qualification_reason,order_count,lifetime_value,created_at")
             .eq("is_valuable", true)
             .eq("is_active", true)
             .order("lifetime_value", { ascending: false });
@@ -20,7 +20,7 @@ const getCustomer = async (req, res) => {
     try {
         const { data, error } = await req.supabase
             .from("customers")
-            .select("id,name,email,phone,address,qualification_reason,completed_order_count,lifetime_value,created_at")
+            .select("id,name,email,phone,address,qualification_reason,order_count,lifetime_value,created_at")
             .eq("id", req.params.id)
             .eq("is_valuable", true)
             .maybeSingle();
