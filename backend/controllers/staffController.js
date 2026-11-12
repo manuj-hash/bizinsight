@@ -24,9 +24,14 @@ const getStaff = async (req, res) => {
             }
         }
 
+        let departmentQuery = db.from("departments").select("id,name,is_active").order("name");
+        if (req.profile.role === "manager" && req.profile.manager_scope === "department") {
+            departmentQuery = departmentQuery.eq("id", req.profile.department_id);
+        }
+
         const [{ data: staff, error }, { data: departments, error: departmentError }] = await Promise.all([
             query,
-            db.from("departments").select("id,name,is_active").order("name")
+            departmentQuery
         ]);
         if (error) throw error;
         if (departmentError) throw departmentError;
@@ -63,8 +68,13 @@ const getStaff = async (req, res) => {
 };
 
 const inviteEmployee = async (req, res) => {
+    let db;
+    let invitedUserId = null;
     try {
-        if (!["admin", "manager"].includes(req.profile.role)) return res.status(403).json({ message: "Only Admin or an authorized Manager can invite employees" });
+        if (!["admin", "manager"].includes(req.profile.role)) {
+            return res.status(403).json({ message: "Only Admin or an authorized Manager can invite employees" });
+        }
+
         const full_name = String(req.body.full_name || "").trim();
         const email = String(req.body.email || "").trim().toLowerCase();
         const phone = String(req.body.phone || "").trim();
@@ -80,24 +90,37 @@ const inviteEmployee = async (req, res) => {
         if (req.profile.role === "manager" && role !== "staff") {
             return res.status(403).json({ message: "Only Admin can appoint Managers" });
         }
+        if (role === "staff" && !departmentId) {
+            return res.status(400).json({ message: "Select a department for this employee" });
+        }
         if (req.profile.role === "manager" && req.profile.manager_scope === "department" &&
             departmentId !== req.profile.department_id) {
             return res.status(403).json({ message: "You can add staff only to your department" });
         }
-        if (role === "staff" && !departmentId) {
-            return res.status(400).json({ message: "Select a department for this employee" });
+        if (role === "manager" && !["company", "department"].includes(scope)) {
+            return res.status(400).json({ message: "Select a valid Manager scope" });
+        }
+        if (role === "manager" && scope === "company" && (departmentId || reportsTo)) {
+            return res.status(400).json({ message: "A company-wide Manager cannot be assigned to a department or reporting Manager" });
         }
 
-        const db = adminClient();
-        const { data, error } = await db.auth.admin.inviteUserByEmail(email, {
+        db = adminClient();
+        if (departmentId) {
+            const { data: department, error: departmentError } = await db.from("departments")
+                .select("id").eq("id", departmentId).eq("is_active", true).maybeSingle();
+            if (departmentError) throw departmentError;
+            if (!department) return res.status(400).json({ message: "Select an active department" });
+        }
+
+        const { data: data, error } = await db.auth.admin.inviteUserByEmail(email, {
             data: { full_name, phone }
         });
         if (error) throw error;
+        invitedUserId = data.user.id;
 
-        // The auth.users trigger creates the base profile synchronously.
         const { data: assigned, error: assignError } = await db.rpc("admin_set_bizinsight_employee", {
             p_actor_id: req.user.id,
-            p_employee_id: data.user.id,
+            p_employee_id: invitedUserId,
             p_role: role,
             p_department_id: departmentId,
             p_designation: designation || null,
@@ -106,11 +129,18 @@ const inviteEmployee = async (req, res) => {
         });
         if (assignError) throw assignError;
 
+        invitedUserId = null;
         return res.status(201).json({
             message: role === "manager" ? "Manager invitation sent." : "Staff invitation sent.",
             employee: { id: data.user.id, full_name, role: assigned.role, department_id: assigned.department_id }
         });
     } catch (error) {
+        if (invitedUserId && db) {
+            const { error: cleanupError } = await db.auth.admin.deleteUser(invitedUserId);
+            if (cleanupError) {
+                console.error("Failed to clean up incomplete invited account:", cleanupError.message);
+            }
+        }
         console.error("Staff invitation error:", error.message);
         return res.status(400).json({ message: error.message || "Unable to invite employee" });
     }
