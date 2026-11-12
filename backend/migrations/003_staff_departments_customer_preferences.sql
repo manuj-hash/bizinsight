@@ -90,8 +90,8 @@ CREATE INDEX IF NOT EXISTS employee_compensation_profile_date_idx
 ALTER TABLE public.customers
   ADD COLUMN IF NOT EXISTS is_valuable boolean NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS qualification_reason text,
-  ADD COLUMN IF NOT EXISTS completed_order_count integer NOT NULL DEFAULT 0
-    CHECK (completed_order_count >= 0),
+  ADD COLUMN IF NOT EXISTS order_count integer NOT NULL DEFAULT 0
+    CHECK (order_count >= 0),
   ADD COLUMN IF NOT EXISTS lifetime_value numeric(14,2) NOT NULL DEFAULT 0
     CHECK (lifetime_value >= 0);
 
@@ -546,7 +546,7 @@ BEGIN
       INTO v_completed_count, v_lifetime_value
     FROM public.orders o
     JOIN private.order_customer_identity oi ON oi.order_id = o.id
-    WHERE oi.fingerprint = p_customer_fingerprint AND o.status = 'completed';
+    WHERE oi.fingerprint = p_customer_fingerprint AND o.status <> 'cancelled';
 
     SELECT frequent_customer_min_orders, high_value_customer_amount
       INTO v_min_orders, v_high_value
@@ -560,7 +560,7 @@ BEGIN
       v_reason := CASE WHEN v_completed_count >= v_min_orders THEN 'frequent' ELSE 'high_value' END;
       INSERT INTO public.customers(
         name, email, phone, address, is_active, is_valuable,
-        qualification_reason, completed_order_count, lifetime_value
+        qualification_reason, order_count, lifetime_value
       ) VALUES (
         btrim(p_customer_name),
         NULLIF(lower(btrim(COALESCE(p_customer_email, ''))), ''),
@@ -577,7 +577,7 @@ BEGIN
           AND o.customer_id IS NULL;
     ELSIF v_customer_id IS NOT NULL THEN
       UPDATE public.customers
-      SET completed_order_count = v_completed_count,
+      SET order_count = v_completed_count,
           lifetime_value = v_lifetime_value,
           qualification_reason = CASE
             WHEN v_completed_count >= v_min_orders THEN 'frequent' ELSE 'high_value' END
