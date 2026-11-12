@@ -43,7 +43,7 @@ function renderPermissions(){
 function renderDelegations(){
  const host=$("delegationList");host.replaceChildren();
  if(me.role!=="admin"){$("delegationCard").hidden=true;return;}
- const current=new Map(delegations.filter(d=>d.is_active).map(d=>[d.permission_code,d]));
+ const current=new Map(delegations.filter(d=>d.is_active&&d.manager_id===$("employee").value).map(d=>[d.permission_code,d]));
  catalog.forEach(p=>{
   const row=document.createElement("div");row.className="permission-row";
   const box=document.createElement("div");box.style.flex="1";
