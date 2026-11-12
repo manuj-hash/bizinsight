@@ -1,11 +1,7 @@
 const { getAdminClient } = require("../config/supabase");
 
 const adminClient = () => getAdminClient();
-const isValidDateOnly = value => {
-    if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
-    const parsed = new Date(`${value}T00:00:00.000Z`);
-    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-};
+const { isValidDateOnly, validateCompensationInput } = require("../utils/compensationValidation");
 const managerCanAccessDepartment = (profile, departmentId) =>
     profile.role === "admin" ||
     (profile.role === "manager" && (
@@ -298,23 +294,9 @@ const updatePreferences = async (req, res) => {
 
 const updateCompensation = async (req, res) => {
     try {
-        const salary = Number(req.body.base_salary);
-        const currencyCode = String(req.body.currency_code || "INR").toUpperCase();
-        const payFrequency = req.body.pay_frequency || "monthly";
-        const effectiveFrom = req.body.effective_from || new Date().toISOString().slice(0, 10);
-        if (!Number.isFinite(salary) || salary < 0 || salary > 999999999999.99 ||
-            !/^\\d+(?:\\.\\d{1,2})?$/.test(String(req.body.base_salary))) {
-            return res.status(400).json({ message: "Enter a valid salary with no more than two decimal places" });
-        }
-        if (!/^[A-Z]{3}$/.test(currencyCode)) {
-            return res.status(400).json({ message: "Enter a valid three-letter currency code" });
-        }
-        if (!["hourly", "weekly", "monthly", "yearly"].includes(payFrequency)) {
-            return res.status(400).json({ message: "Select a valid pay frequency" });
-        }
-        if (!isValidDateOnly(effectiveFrom) || effectiveFrom < new Date().toISOString().slice(0, 10)) {
-            return res.status(400).json({ message: "Effective date must be a valid date and cannot be in the past" });
-        }
+        const validation = validateCompensationInput(req.body);
+        if (!validation.valid) return res.status(400).json({ message: validation.message });
+        const { salary, currencyCode, payFrequency, effectiveFrom } = validation;
         const { data, error } = await req.supabase.rpc("set_bizinsight_employee_compensation", {
             p_employee_id: req.params.id,
             p_base_salary: salary,
