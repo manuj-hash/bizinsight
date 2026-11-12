@@ -1,7 +1,7 @@
 # BizInsight Integration Hardening — 2026-11-12
 
 **Branch:** `fix/permission-boundary-and-integration`  
-**Status:** Application changes committed; database migrations 006–008 are prepared but not yet applied.
+**Status:** Database migrations 006–009 are applied and verified; branch syntax/dependency workflow passed for the latest code commit.
 
 ## Application changes committed
 
@@ -39,16 +39,28 @@
 
 - Adds server-only RPCs for message/issue creation and recipient notification insertion in one database transaction.
 
+## Database rollout and verification completed
+
+- Migrations 006, 007, 008, and 009 are recorded in Supabase migration history.
+- RLS is enabled on the core business tables.
+- Direct Data API access to sensitive department, compensation, and company preference tables is revoked from anon/authenticated; Express uses the server-side client.
+- Direct authenticated writes to products, orders, order items, customers, and inventory ledger are revoked. Product, order, customer and stock mutations stay in controlled backend workflows.
+- Profile self-update is limited to full_name and phone; role, department and manager scope cannot be changed through the browser Data API.
+- The three new server RPCs (product archive, communication message, work issue) are executable by service_role only.
+- The database query found zero remaining unindexed foreign keys.
+- Inventory ledger matches current stock for both products; the one order's subtotal matches its line-item total.
+- RLS simulation: the Staff profile sees only its own profile and zero products/orders/customers without assigned permissions; Admin sees 2 products, 1 order and all 3 profiles.
+- Existing row counts remain: profiles 3, products 2, inventory movements 1, orders 1, order items 1, customers 0, departments 0, messages 0, issues 0, communication notifications 0.
+- GitHub Actions syntax check, npm ci and production dependency audit passed for commit `6f932ea`.
+
 ## Remaining verification
 
-1. Apply migrations 006–008 to the connected Supabase project after explicit approval.
-2. Verify grants, RLS policies, compensation scope, product stock/archival guards, and communication RPC grants.
-3. Run Supabase Security and Performance Advisors again.
-4. Confirm missing foreign-key index findings are cleared or explain any remaining items.
-5. Enable leaked-password protection in Supabase Auth settings and test login/password change flows.
-6. Run Admin, company Manager, department Manager, and Staff end-to-end tests with separate accounts.
-7. Run CI syntax/dependency checks and browser-level smoke tests.
-8. Test dashboard, inventory, orders, customers, analytics, reports, staff management, permissions, communication, complaints, and notifications against real records.
+1. Enable leaked-password protection in Supabase Auth settings and test login/password change flows.
+2. Run real sign-in/API tests for Admin and Staff. No Manager profile currently exists, so company-Manager and department-Manager workflows need a dedicated test account before they can be verified end-to-end.
+3. Run browser-level smoke tests for dashboard, inventory, orders, customers, analytics, reports, staff management, permissions, communication, complaints and notifications.
+4. Review 11 Supabase INFO findings for RLS-enabled server-only tables with no policies. These tables intentionally have no anon/authenticated grants and are accessed by the trusted service-role backend only.
+5. Reassess unused-index INFO findings after the application has real query traffic; do not remove indexes based only on a low-traffic advisor snapshot.
+
 
 ## Important rollout boundary
 
