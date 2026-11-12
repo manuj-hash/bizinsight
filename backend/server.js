@@ -68,6 +68,7 @@ app.use("/api/customers", require("./routes/customerRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/staff", require("./routes/staffRoutes"));
 
 // Unknown API
 app.use("/api", (req, res) => {
