@@ -9,7 +9,7 @@ const pageMap={
  "analytics.html":["analytics.view","inventory.view"],
  "reports.html":["reports.view"],
  "staff.html":["staff.view","staff.manage"],
- "access-control.html":["staff.view","staff.manage"],
+ "access-control.html":["staff.view"],
  "communication.html":["communication.access"],
  "profile.html":[]
 };
@@ -60,7 +60,7 @@ async function init(){
    link.href="communication.html";link.textContent="Communication";link.dataset.bizCommunication="true";
    sidebar.insertBefore(link,sidebar.querySelector('a[href="profile.html"]')||null);
   }
-  if(sidebar&&!sidebar.querySelector('a[href="access-control.html"]')&&(admin||granted.has("staff.view")||granted.has("staff.manage"))){
+  if(sidebar&&!sidebar.querySelector('a[href="access-control.html"]')&&(admin||granted.has("staff.view"))){
    const link=document.createElement("a");
    link.href="access-control.html";link.textContent="Access Control";link.dataset.bizAccess="true";
    const staffLink=sidebar.querySelector('a[href="staff.html"]');
