@@ -1,7 +1,7 @@
 const { getAdminClient } = require("../config/supabase");
 
 const adminClient = () => getAdminClient();
-const { isValidDateOnly, validateCompensationInput } = require("../utils/compensationValidation");
+const { validateCompensationInput } = require("../utils/compensationValidation");
 const managerCanAccessDepartment = (profile, departmentId) =>
     profile.role === "admin" ||
     (profile.role === "manager" && (
