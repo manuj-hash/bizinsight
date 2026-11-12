@@ -109,8 +109,13 @@ CREATE POLICY "Permissioned users update products"
   USING (private.has_bizinsight_permission('inventory.update'))
   WITH CHECK (private.has_bizinsight_permission('inventory.update'));
 
-GRANT SELECT, INSERT, UPDATE ON public.products TO authenticated;
-REVOKE DELETE ON public.products FROM authenticated;
+GRANT SELECT ON public.products TO authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.products FROM authenticated;
+-- Stock and archive flags are never writable through the browser Data API.
+GRANT INSERT (sku, name, description, category, price, cost_price, reorder_level)
+  ON public.products TO authenticated;
+GRANT UPDATE (sku, name, description, category, price, cost_price, reorder_level)
+  ON public.products TO authenticated;
 
 -- Orders and line items are read-only through the Data API. All order writes
 -- must go through the atomic, server-side order lifecycle RPCs.
