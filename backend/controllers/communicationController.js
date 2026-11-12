@@ -189,6 +189,19 @@ const listResponsibilities=async(req,res)=>{
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
 };
 
+const listDepartmentMembers=async(req,res)=>{
+    try{
+        if(!has(req,"communication.responsibility.manage"))return res.status(403).json({message:"Responsibility management is not granted"});
+        const departmentId=req.query.department_id||req.profile.department_id;
+        if(!departmentId||(req.profile.role!=="admin"&&departmentId!==req.profile.department_id))
+            return res.status(403).json({message:"You cannot manage communicators for this department"});
+        const {data,error}=await getAdminClient().from("profiles")
+            .select("id,full_name,role,department_id").eq("department_id",departmentId)
+            .in("role",["manager","staff"]).order("full_name");
+        if(error)throw error;return res.json(data||[]);
+    }catch(error){return res.status(500).json({message:"Unable to load department members"});}
+};
+
 const listComplaintTargets=async(req,res)=>{
     try{
         if(!has(req,"communication.complaints.submit"))return res.status(403).json({message:"Complaint submission is not granted"});
@@ -226,4 +239,4 @@ const markNotificationRead=async(req,res)=>{
     }catch(error){return res.status(400).json({message:"Unable to update notification"});}
 };
 
-module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets};
+module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets,listDepartmentMembers};
