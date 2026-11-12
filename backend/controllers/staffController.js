@@ -123,7 +123,19 @@ const inviteEmployee = async (req, res) => {
             p_manager_scope: role === "manager" ? scope : null,
             p_reports_to: role === "manager" ? reportsTo : (req.profile.role === "manager" ? req.user.id : null)
         });
-        if (assignError) throw assignError;
+        if (assignError) {
+            // Compensate for the Auth invitation if the database role/scope
+            // assignment fails; do not leave an invited account without a
+            // valid BizInsight employee profile.
+            const { error: cleanupError } = await db.auth.admin.deleteUser(data.user.id);
+            if (cleanupError) {
+                console.error("Failed to clean up unassigned invited user:", cleanupError.message);
+                return res.status(500).json({
+                    message: "Employee setup failed and the pending Auth invitation could not be removed. Contact Admin before retrying."
+                });
+            }
+            throw assignError;
+        }
 
         return res.status(201).json({
             message: role === "manager" ? "Manager invitation sent." : "Staff invitation sent.",
