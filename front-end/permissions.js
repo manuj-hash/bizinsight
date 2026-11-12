@@ -1,6 +1,7 @@
 (function(){
 "use strict";
 const token=()=>sessionStorage.getItem("bizinsight_token");
+const NOTICE_KEY="bizinsight_access_notice";
 const pageMap={
  "dashboard.html":["dashboard.view"],
  "inventory.html":["inventory.view"],
@@ -20,6 +21,31 @@ const hrefPermission={
  "staff.html":["staff.view","staff.manage"],"access-control.html":["staff.view"],
  "communication.html":["communication.access"]
 };
+function showAccessNotice(message){
+ let notice=document.getElementById("bizinsight-access-notice");
+ if(!notice){
+  notice=document.createElement("div");
+  notice.id="bizinsight-access-notice";
+  notice.setAttribute("role","alert");
+  notice.setAttribute("aria-live","assertive");
+  notice.style.cssText="position:fixed;top:16px;right:16px;z-index:99999;max-width:min(440px,calc(100vw - 32px));padding:14px 18px;border:1px solid #f2b8b5;border-left:5px solid #b42318;border-radius:10px;background:#fff;color:#7a271a;box-shadow:0 8px 28px rgba(16,24,40,.16);font:500 14px/1.5 Arial,sans-serif";
+  document.body.appendChild(notice);
+ }
+ notice.textContent=message;
+}
+function takeAccessNotice(){
+ const message=sessionStorage.getItem(NOTICE_KEY);
+ if(!message)return;
+ sessionStorage.removeItem(NOTICE_KEY);
+ showAccessNotice(message);
+}
+function denyAccess(message){
+ sessionStorage.setItem(NOTICE_KEY,message);
+ const current=location.pathname.split("/").pop();
+ const fallback=["dashboard.html","inventory.html","orders.html","customers.html","analytics.html","reports.html","communication.html","profile.html"]
+  .find(file=>file==="profile.html"||hasAny(hrefPermission[file]||[],window.bizInsightAccess?.permissions||new Set()));
+ location.replace(fallback||"profile.html");
+}
 function hasAny(list,granted){return list.some(code=>granted.has(code));}
 function applyActionVisibility(granted,admin){
  const can=code=>admin||granted.has(code);
@@ -44,11 +70,12 @@ function applyActionVisibility(granted,admin){
  });
 }
 async function init(){
+ takeAccessNotice();
  if(!token())return;
  try{
   const response=await fetch("/api/permissions/me",{headers:{Authorization:"Bearer "+token()}});
   const data=await response.json();
-  if(!response.ok)throw new Error(data.message||"Unable to load access rights");
+  if(!response.ok)throw new Error(data.message||"Unable to verify your access. Please sign in again or contact your administrator.");
   const granted=new Set(data.permissions||[]);
   const admin=data.role==="admin";
   document.querySelectorAll(".sidebar a[href]").forEach(link=>{
@@ -72,11 +99,12 @@ async function init(){
   }
   const current=location.pathname.split("/").pop();
   const required=pageMap[current];
-  if((current==="staff.html"||current==="access-control.html")&&data.role==="staff"){location.replace("profile.html");return;}
+  if((current==="staff.html"||current==="access-control.html")&&data.role==="staff"){
+   denyAccess("Access denied. This page is restricted to authorized Admin and Manager accounts. Contact your administrator if you need access.");
+   return;
+  }
   if(required&&required.length&&!admin&&!hasAny(required,granted)){
-   const first=["dashboard.html","inventory.html","orders.html","customers.html","analytics.html","reports.html","staff.html","communication.html","profile.html"]
-    .find(file=>file==="profile.html"||hasAny(hrefPermission[file]||[],granted));
-   location.replace(first||"profile.html");
+   denyAccess("Access denied. You do not have permission to open this page. Contact your administrator if you need access.");
    return;
   }
   if(admin||granted.has("communication.access")){
@@ -95,7 +123,16 @@ async function init(){
   applyActionVisibility(granted,admin);
   if(!window.__bizInsightPermissionObserver){window.__bizInsightPermissionObserver=new MutationObserver(()=>applyActionVisibility(granted,admin));window.__bizInsightPermissionObserver.observe(document.body,{childList:true,subtree:true});}
   document.dispatchEvent(new CustomEvent("bizinsight:access-ready",{detail:window.bizInsightAccess}));
- }catch(error){console.error("BizInsight access check:",error);document.body.innerHTML='<main style="padding:32px;font-family:Arial"><h2>Access could not be verified</h2><p>Please sign in again or contact your administrator.</p><a href="index.html">Return to login</a></main>';}
+ }catch(error){
+  console.error("BizInsight access check:",error);
+  showAccessNotice("Your access could not be verified. Please sign in again or contact your administrator.");
+  const main=document.createElement("main");
+  main.style.cssText="padding:32px;font-family:Arial";
+  const heading=document.createElement("h2");heading.textContent="Access could not be verified";
+  const message=document.createElement("p");message.textContent="Please sign in again or contact your administrator.";
+  const link=document.createElement("a");link.href="index.html";link.textContent="Return to login";
+  main.append(heading,message,link);document.body.replaceChildren(main);
+ }
 }
 document.addEventListener("DOMContentLoaded",init);
 })();
