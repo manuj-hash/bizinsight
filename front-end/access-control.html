@@ -71,7 +71,7 @@ async function init(){
   $("employee").replaceChildren();
   employees.forEach(e=>{const o=document.createElement("option");o.value=e.id;o.textContent=e.full_name+" ("+e.role+")";$("employee").appendChild(o);});
   if(!employees.length){status("No eligible employees found.",true);return;}
-  $("employee").addEventListener("change",()=>loadEmployee().catch(e=>status(e.message,true)));
+  $("employee").addEventListener("change",async()=>{try{await loadEmployee();renderDelegations();}catch(e){status(e.message,true);}});
   await loadEmployee();renderDelegations();
   status("Access controls loaded.");
  }catch(e){status(e.message,true);}
