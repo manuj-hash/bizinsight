@@ -109,7 +109,7 @@ function applyActionVisibility(granted,admin){
   if(label==="add product")hide(button,!can("inventory.create"));
   if(label.includes("create order"))hide(button,!can("orders.create"));
   if(label.includes("update status")||label.includes("cancel order"))hide(button,!can("orders.update"));
-  if(label==="edit")hide(button,!can("inventory.update")&&!can("orders.update"));
+  if(label==="edit"&&button.dataset.bizAction==="staff.manage")hide(button,!can("staff.manage"));\n  else if(label==="edit")hide(button,!can("inventory.update")&&!can("orders.update"));
   if(label.includes("archive")||label.includes("delete"))hide(button,!admin);
  });
 }
