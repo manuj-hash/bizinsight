@@ -12,10 +12,10 @@
     <a href="dashboard.html">Dashboard</a>
     <a href="inventory.html">Inventory</a>
     <a href="orders.html" class="active">Sales & Orders</a>
-    <a href="customers.html">Customers</a>
+    <a href="customers.html" id="customersNavLink">Customers</a>
     <a href="analytics.html">Analytics</a>
     <a href="reports.html">Reports</a>
-    <a href="users.html" id="adminUsersLink">User Management</a>
+    <a href="staff.html" id="staffNavLink">Staff Management</a>
     <a href="profile.html">Profile</a>
     <a href="index.html" class="lout" id="logoutLink">Logout</a>
 </div>
@@ -29,10 +29,22 @@
     <section class="form-container">
         <h3>Create Sales Order</h3>
         <form id="orderForm">
-            <label for="customerSelect">Customer (optional)</label>
-            <select id="customerSelect">
-                <option value="">Walk-in customer</option>
-            </select>
+            <div id="customerRegistryChooser">
+                <label for="customerSelect">Existing valuable customer (optional)</label>
+                <select id="customerSelect"><option value="">New / walk-in buyer</option></select>
+            </div>
+            <fieldset style="border:1px solid #d6dce5;border-radius:10px;padding:14px;margin:14px 0">
+                <legend>Buyer details (used only to identify qualifying customers)</legend>
+                <p style="font-size:13px;color:#64748b">Enter a name and phone or email if the buyer wants to be recognized for repeat/high-value purchases. Details are not saved as a customer profile until the configured threshold is met.</p>
+                <label for="customerName">Customer name</label>
+                <input id="customerName" maxlength="150" autocomplete="off">
+                <label for="customerEmail">Email</label>
+                <input id="customerEmail" type="email" maxlength="254" autocomplete="off">
+                <label for="customerPhone">Phone</label>
+                <input id="customerPhone" type="tel" maxlength="30" autocomplete="off">
+                <label for="customerAddress">Address (optional)</label>
+                <input id="customerAddress" maxlength="500" autocomplete="off">
+            </fieldset>
 
             <h4>Order items</h4>
             <div id="itemRows"></div>
@@ -71,6 +83,7 @@ const API="/api";
 const token=()=>sessionStorage.getItem("bizinsight_token");
 let products=[];
 let customers=[];
+const currentUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
 
 function headers(json=false){
     if(!token()) throw new Error("Your session has expired. Please sign in again.");
@@ -130,12 +143,20 @@ function addItemRow(selectedId="",quantity=1){
     document.getElementById("itemRows").append(row);
 }
 async function loadReferenceData(){
-    const [productData,customerData]=await Promise.all([api("/products"),api("/customers")]);
+    const productData=await api("/products");
     products=(Array.isArray(productData)?productData:productData.products||[]).filter(p=>p.is_active!==false);
-    customers=(Array.isArray(customerData)?customerData:customerData.customers||[]).filter(c=>c.is_active!==false);
+    const chooser=document.getElementById("customerRegistryChooser");
     const select=document.getElementById("customerSelect");
-    select.replaceChildren(new Option("Walk-in customer",""));
-    customers.forEach(customer=>select.add(new Option(customer.name,customer.id)));
+    if(["admin","manager"].includes(currentUser.role)){
+        const customerData=await api("/customers");
+        customers=(Array.isArray(customerData)?customerData:customerData.customers||[]).filter(c=>c.is_active!==false);
+        select.replaceChildren(new Option("New / walk-in buyer",""));
+        customers.forEach(customer=>select.add(new Option(customer.name,customer.id)));
+        chooser.hidden=false;
+    }else{
+        customers=[];
+        chooser.hidden=true;
+    }
     if(!document.querySelector(".order-item-row")) addItemRow();
 }
 function cell(row,value){
@@ -204,6 +225,10 @@ document.getElementById("orderForm").addEventListener("submit",async event=>{
     try{
         const result=await api("/orders",{method:"POST",body:JSON.stringify({
             customer_id:document.getElementById("customerSelect").value||null,
+            customer_name:document.getElementById("customerName").value.trim(),
+            customer_email:document.getElementById("customerEmail").value.trim(),
+            customer_phone:document.getElementById("customerPhone").value.trim(),
+            customer_address:document.getElementById("customerAddress").value.trim(),
             items,tax_amount:tax,discount_amount:discount,status:"pending"
         })});
         showMessage(result.message||"Order created successfully.");
@@ -222,8 +247,19 @@ document.getElementById("logoutLink").addEventListener("click",()=>{
     localStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
 });
+document.getElementById("customerSelect").addEventListener("change",()=>{
+    const customer=customers.find(c=>String(c.id)===document.getElementById("customerSelect").value);
+    document.getElementById("customerName").value=customer?.name||"";
+    document.getElementById("customerEmail").value=customer?.email||"";
+    document.getElementById("customerPhone").value=customer?.phone||"";
+    document.getElementById("customerAddress").value=customer?.address||"";
+});
 document.addEventListener("DOMContentLoaded",async()=>{
     if(!token()){window.location.href="index.html";return;}
+    if(!["admin","manager"].includes(currentUser.role)){
+        const link=document.getElementById("customersNavLink");if(link)link.hidden=true;
+        const staffLink=document.getElementById("staffNavLink");if(staffLink)staffLink.hidden=true;
+    }
     try{await loadReferenceData();await loadOrders();}
     catch(error){showMessage(error.message,true);}
 });
