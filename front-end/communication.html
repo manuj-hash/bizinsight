@@ -33,8 +33,44 @@ async function loadNotifications(){
  if(!items.length)host.textContent="No notifications yet.";
 }
 async function loadMessages(){const items=await api("/communication/messages");$("teamList").replaceChildren();$("generalList").replaceChildren();items.forEach(x=>card(x.message_type==="team"?$("teamList"):$("generalList"),x,x.message_type));}
-async function loadIssues(){const items=await api("/communication/issues");$("issueList").replaceChildren();items.forEach(x=>card($("issueList"),x,x.status+" · "+x.priority));}
-async function loadComplaints(){const items=await api("/communication/complaints");$("complaintList").replaceChildren();items.forEach(x=>card($("complaintList"),x,x.status+" · Confidential"));}
+async function loadIssues(){
+ const items=await api("/communication/issues");$("issueList").replaceChildren();
+ items.forEach(x=>{
+  const el=document.createElement("article");el.className="item";
+  const h=document.createElement("h3");h.textContent=x.title;
+  const meta=document.createElement("div");meta.className="muted";meta.textContent=x.status+" · "+x.priority;
+  const p=document.createElement("p");p.textContent=x.description;
+  el.append(h,meta,p);
+  if(access.role==="admin"||access.permissions.includes("communication.issues.manage")){
+   const select=document.createElement("select");["open","in_progress","blocked","resolved","closed"].forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;select.appendChild(o);});select.value=x.status;
+   const save=document.createElement("button");save.className="primary";save.textContent="Update issue";
+   save.addEventListener("click",async()=>{try{await api("/communication/issues/"+x.id,{method:"PATCH",body:JSON.stringify({status:select.value})});await loadIssues();status("Issue updated.");}catch(e){status(e.message,true);}});
+   el.append(select,save);
+  }
+  $("issueList").appendChild(el);
+ });
+}
+async function loadComplaints(){
+ const items=await api("/communication/complaints");$("complaintList").replaceChildren();
+ const canReview=access.role==="admin"||access.permissions.includes("communication.complaints.review");
+ items.forEach(x=>{
+  const el=document.createElement("article");el.className="item";
+  const h=document.createElement("h3");h.textContent=x.subject;
+  const meta=document.createElement("div");meta.className="muted";meta.textContent=x.status+" · Confidential · "+new Date(x.created_at).toLocaleString("en-IN");
+  const p=document.createElement("p");p.textContent=x.description;
+  el.append(h,meta,p);
+  if(canReview){
+   const select=document.createElement("select");["under_review","resolved","closed"].forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;select.appendChild(o);});select.value=x.status==="submitted"?"under_review":x.status;
+   const save=document.createElement("button");save.className="primary";save.textContent="Update complaint";
+   save.addEventListener("click",async()=>{try{await api("/communication/complaints/"+x.id,{method:"PATCH",body:JSON.stringify({status:select.value})});await loadComplaints();status("Complaint status updated.");}catch(e){status(e.message,true);}});
+   const reply=document.createElement("textarea");reply.placeholder="Private investigation response";
+   const send=document.createElement("button");send.className="primary";send.textContent="Add private response";
+   send.addEventListener("click",async()=>{try{await api("/communication/complaints/"+x.id+"/responses",{method:"POST",body:JSON.stringify({body:reply.value})});reply.value="";status("Private response added.");}catch(e){status(e.message,true);}});
+   el.append(select,save,reply,send);
+  }
+  $("complaintList").appendChild(el);
+ });
+}
 async function loadResponsibility(){const items=await api("/communication/responsibilities");$("responsibilityInfo").replaceChildren();items.forEach(x=>{const d=document.createElement("div");d.className="item";d.textContent="Department "+x.department_id+" · Primary "+x.primary_user_id+" · Backup "+x.backup_user_id+" · Active publisher "+x.active_publisher_user_id;$("responsibilityInfo").appendChild(d);});}
 function hideTab(name){const b=document.querySelector('[data-tab="'+name+'"]');if(b)b.hidden=true;const panel=$(name);if(panel)panel.hidden=true;}
 async function loadDepartmentMembers(){
