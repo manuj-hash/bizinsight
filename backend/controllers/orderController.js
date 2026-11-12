@@ -123,7 +123,7 @@ const createOrder = async (req, res) => {
             throw rpcError;
         }
 
-        const { data: completeOrder, error: fetchError } = await req.supabase
+        const { data: completeOrder, error: fetchError } = await getAdminClient()
             .from("orders").select(ORDER_SELECT).eq("id", orderId).single();
         if (fetchError) throw fetchError;
 
@@ -155,7 +155,7 @@ const updateOrder = async (req, res) => {
             }
             throw error;
         }
-        const { data: order, error: fetchError } = await req.supabase
+        const { data: order, error: fetchError } = await getAdminClient()
             .from("orders").select(ORDER_SELECT).eq("id", orderId).single();
         if (fetchError) throw fetchError;
         return res.json({
