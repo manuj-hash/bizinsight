@@ -207,13 +207,21 @@ BEGIN
   IF auth.uid() IS NULL OR p_employee_id IS NULL OR p_role IS NULL THEN
     RAISE EXCEPTION 'An authenticated actor, employee and role are required';
   END IF;
-  IF p_actor_id = p_employee_id THEN
+  IF auth.uid() = p_employee_id THEN
     RAISE EXCEPTION 'You cannot change your own employee role or assignment';
   END IF;
 
   SELECT * INTO v_actor FROM public.profiles WHERE id = (SELECT auth.uid());
   IF NOT FOUND OR v_actor.role NOT IN ('admin', 'manager') THEN
     RAISE EXCEPTION 'Only Admin or an authorized Manager may manage staff';
+  END IF;
+  IF v_actor.role = 'manager' AND NOT EXISTS (
+    SELECT 1 FROM public.user_permissions
+    WHERE user_id = (SELECT auth.uid())
+      AND permission_code = 'staff.manage'
+      AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Manager requires staff.manage permission';
   END IF;
   IF p_role NOT IN ('manager', 'staff') THEN
     RAISE EXCEPTION 'Invalid employee role';
@@ -322,6 +330,14 @@ BEGIN
   IF NOT FOUND OR v_actor.role NOT IN ('admin', 'manager') THEN
     RAISE EXCEPTION 'Only Admin and Managers may update preferences';
   END IF;
+  IF v_actor.role = 'manager' AND NOT EXISTS (
+    SELECT 1 FROM public.user_permissions
+    WHERE user_id = (SELECT auth.uid())
+      AND permission_code = 'staff.departments.manage'
+      AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Manager requires staff.departments.manage permission';
+  END IF;
   IF p_management_mode IS NOT NULL THEN
     IF v_actor.role <> 'admin' THEN
       RAISE EXCEPTION 'Only Admin can change management structure';
@@ -392,6 +408,14 @@ BEGIN
         AND v_actor.department_id IS DISTINCT FROM v_employee.department_id)
   ) THEN
     RAISE EXCEPTION 'Managers can manage compensation only within their authorized scope';
+  END IF;
+  IF v_actor.role = 'manager' AND NOT EXISTS (
+    SELECT 1 FROM public.user_permissions
+    WHERE user_id = (SELECT auth.uid())
+      AND permission_code = 'staff.compensation.manage'
+      AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Manager requires staff.compensation.manage permission';
   END IF;
   IF p_base_salary IS NULL OR p_base_salary < 0 THEN RAISE EXCEPTION 'Invalid salary'; END IF;
   IF p_effective_from IS NULL OR p_effective_from < CURRENT_DATE THEN
