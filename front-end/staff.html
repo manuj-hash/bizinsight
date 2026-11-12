@@ -135,7 +135,7 @@ async function loadStaff(){
    cell(row,canViewSalary?(salary?Number(salary.base_salary).toLocaleString("en-IN",{style:"currency",currency:salary.currency_code||"INR",maximumFractionDigits:2})+" / "+salary.pay_frequency:"Not set"):"Restricted");
    const actions=row.insertCell();
    if(person.role==="admin"){actions.textContent="Protected administrator account";return;}
-   const canEdit=me.role==="admin"||(me.role==="manager"&&person.role==="staff"&&(me.manager_scope==="company"||person.department_id===me.department_id));
+   const canEdit=me.role==="admin"||(me.role==="manager"&&accessPermissions.has("staff.manage")&&person.role==="staff"&&(me.manager_scope==="company"||person.department_id===me.department_id));
    if(!canEdit){actions.textContent="—";return;}
    const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";
    edit.addEventListener("click",()=>editEmployee(person));
