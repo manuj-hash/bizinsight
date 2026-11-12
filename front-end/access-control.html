@@ -27,7 +27,7 @@ function renderPermissions(){
  const isAdmin=me.role==="admin";
  const allowed=isAdmin?catalog.map(p=>p.code):delegations.filter(d=>d.can_grant||d.can_revoke).map(d=>d.permission_code);
  const active=new Set(assigned.filter(p=>p.is_active).map(p=>p.permission_code));
- catalog.filter(p=>allowed.includes(p.code)).forEach(p=>{
+ catalog.filter(p=>allowed.includes(p.code)&&(selectedEmployee?.role!=="staff"||(!p.code.startsWith("staff.")&&!p.code.startsWith("permissions.")&&!["communication.complaints.review","communication.responsibility.manage"].includes(p.code)))).forEach(p=>{
   const row=document.createElement("label");row.className="permission-row";
   const input=document.createElement("input");input.type="checkbox";input.value=p.code;input.checked=active.has(p.code);
   if(me.role==="manager"){
