@@ -3,10 +3,12 @@ const router = express.Router();
 const protect = require("../middleware/authMiddleware");
 const { allowRoles } = protect;
 const { getCustomers, getCustomer, addCustomer, updateCustomer, deleteCustomer } = require("../controllers/customerController");
-router.use(protect, allowRoles("admin", "staff"));
+
+router.use(protect, allowRoles("admin", "manager"));
 router.get("/", getCustomers);
 router.get("/:id", getCustomer);
 router.post("/", addCustomer);
 router.put("/:id", updateCustomer);
 router.delete("/:id", allowRoles("admin"), deleteCustomer);
+
 module.exports = router;
