@@ -1,14 +1,12 @@
-const express = require("express");
-const router = express.Router();
-const protect = require("../middleware/authMiddleware");
-const { allowRoles } = protect;
-const { getCustomers, getCustomer, addCustomer, updateCustomer, deleteCustomer } = require("../controllers/customerController");
-
-router.use(protect, allowRoles("admin", "manager"));
-router.get("/", getCustomers);
-router.get("/:id", getCustomer);
-router.post("/", addCustomer);
-router.put("/:id", updateCustomer);
-router.delete("/:id", allowRoles("admin"), deleteCustomer);
-
-module.exports = router;
+const express=require("express");
+const router=express.Router();
+const protect=require("../middleware/authMiddleware");
+const requirePermission=protect.requirePermission;
+const {getCustomers,getCustomer,addCustomer,updateCustomer,deleteCustomer}=require("../controllers/customerController");
+router.use(protect);
+router.get("/",requirePermission("customers.view"),getCustomers);
+router.get("/:id",requirePermission("customers.view"),getCustomer);
+router.post("/",requirePermission("customers.create"),addCustomer);
+router.put("/:id",requirePermission("customers.update"),updateCustomer);
+router.delete("/:id",requirePermission("customers.archive"),deleteCustomer);
+module.exports=router;
