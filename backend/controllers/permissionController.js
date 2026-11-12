@@ -234,4 +234,40 @@ const changeStaffPermission = async (req, res) => {
     }
 };
 
-module.exports = { catalog, getDelegations, setDelegation, changeStaffPermission };
+
+const listAccessNotifications = async (req, res) => {
+    try {
+        const { data, error } = await getAdminClient()
+            .from("access_notifications")
+            .select("id,event_type,permission_code,title,message,details,created_at,read_at")
+            .eq("user_id", req.user.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+        if (error) throw error;
+        return res.json(data || []);
+    } catch (error) {
+        console.error("Access notifications:", error.message);
+        return res.status(500).json({ message: "Unable to load access notifications" });
+    }
+};
+
+const markAccessNotificationRead = async (req, res) => {
+    try {
+        const { data, error } = await getAdminClient()
+            .from("access_notifications")
+            .update({ read_at: new Date().toISOString() })
+            .eq("id", req.params.notificationId)
+            .eq("user_id", req.user.id)
+            .is("read_at", null)
+            .select("id,read_at")
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) return res.status(404).json({ message: "Access notification not found" });
+        return res.json({ message: "Access notification marked as read", notification: data });
+    } catch (error) {
+        console.error("Mark access notification read:", error.message);
+        return res.status(500).json({ message: "Unable to update access notification" });
+    }
+};
+
+module.exports = { catalog, getDelegations, setDelegation, changeStaffPermission, listAccessNotifications, markAccessNotificationRead };
