@@ -1,0 +1,15 @@
+const express=require("express");
+const router=express.Router();
+const protect=require("../middleware/authMiddleware");
+const c=require("../controllers/communicationController");
+router.use(protect);
+router.get("/messages",c.listMessages);
+router.post("/messages",c.createMessage);
+router.get("/issues",c.listIssues);
+router.post("/issues",c.createIssue);
+router.patch("/issues/:id",c.updateIssue);
+router.get("/complaints",c.listComplaints);
+router.post("/complaints",c.submitComplaint);
+router.get("/responsibilities",c.listResponsibilities);
+router.put("/responsibilities",c.setResponsibility);
+module.exports=router;
