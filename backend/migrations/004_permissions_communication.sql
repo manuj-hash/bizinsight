@@ -219,7 +219,7 @@ DECLARE
   v_target public.profiles%ROWTYPE;
   v_recipient_role text;
   v_department_id uuid;
-  v_month_start timestamptz := date_trunc('month',now());
+  v_month_start timestamptz := date_trunc('month',now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata';
   v_count integer;
   v_id uuid;
 BEGIN
