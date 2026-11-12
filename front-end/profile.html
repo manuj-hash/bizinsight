@@ -173,32 +173,6 @@ document.getElementById("logoutLink").addEventListener("click",()=>{
 });
 document.addEventListener("DOMContentLoaded",loadProfile);
 </script>
-<script>
-try {
-    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
-    if (navUser.role !== "admin") {
-        const adminLink = document.getElementById("adminUsersLink");
-        if (adminLink) adminLink.hidden = true;
-    }
-} catch (_) {
-    const adminLink = document.getElementById("adminUsersLink");
-    if (adminLink) adminLink.hidden = true;
-}
-</script>
-<script>
-(function(){
- try {
-  const navUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
-  if(!["admin","manager"].includes(navUser.role)){
-   const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
-   const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
-  }
- } catch (_) {
-  const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
-  const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
- }
-})();
-</script>
-    <script src="permissions.js" defer></script>
+<script src="permissions.js" defer></script>
 </body>
 </html>
