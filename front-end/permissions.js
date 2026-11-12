@@ -39,11 +39,11 @@ function takeAccessNotice(){
  sessionStorage.removeItem(NOTICE_KEY);
  showAccessNotice(message);
 }
-function denyAccess(message){
+function denyAccess(message,granted){
  sessionStorage.setItem(NOTICE_KEY,message);
  const current=location.pathname.split("/").pop();
  const fallback=["dashboard.html","inventory.html","orders.html","customers.html","analytics.html","reports.html","communication.html","profile.html"]
-  .find(file=>file==="profile.html"||hasAny(hrefPermission[file]||[],window.bizInsightAccess?.permissions||new Set()));
+  .find(file=>file==="profile.html"||hasAny(hrefPermission[file]||[],granted||new Set()));
  location.replace(fallback||"profile.html");
 }
 function hasAny(list,granted){return list.some(code=>granted.has(code));}
@@ -100,11 +100,11 @@ async function init(){
   const current=location.pathname.split("/").pop();
   const required=pageMap[current];
   if((current==="staff.html"||current==="access-control.html")&&data.role==="staff"){
-   denyAccess("Access denied. This page is restricted to authorized Admin and Manager accounts. Contact your administrator if you need access.");
+   denyAccess("Access denied. This page is restricted to authorized Admin and Manager accounts. Contact your administrator if you need access.",granted);
    return;
   }
   if(required&&required.length&&!admin&&!hasAny(required,granted)){
-   denyAccess("Access denied. You do not have permission to open this page. Contact your administrator if you need access.");
+   denyAccess("Access denied. You do not have permission to open this page. Contact your administrator if you need access.",granted);
    return;
   }
   if(admin||granted.has("communication.access")){
