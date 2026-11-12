@@ -16,7 +16,7 @@ const listMessages = async (req,res) => {
             const filters=[];
             if(req.profile.department_id)filters.push("department_id.eq."+req.profile.department_id);
             // General messages are returned only when explicitly targeted to this user's department.
-            if(filters.length)query=query.or(filters.join(","));
+            if(filters.length)query=query.or(`department_id.eq.${req.profile.department_id},target_department_ids.cs.{${req.profile.department_id}}`);
             else query=query.eq("message_type","general").eq("id","00000000-0000-0000-0000-000000000000");
         }
         const {data,error}=await query;
