@@ -62,7 +62,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF NEW.is_active IS DISTINCT FROM OLD.is_active
      AND NOT EXISTS (
@@ -73,7 +73,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION private.guard_bizinsight_archive() FROM PUBLIC, anon, authenticated;
 
