@@ -135,7 +135,7 @@ AS $$
         actor.role = 'admin'
         OR (
           actor.role = 'manager'
-          AND employee.role <> 'admin'
+          AND employee.role = 'staff'
           AND (
             actor.manager_scope = 'company'
             OR (actor.manager_scope = 'department'
@@ -234,6 +234,9 @@ BEGIN
   END IF;
 
   IF v_actor.role = 'manager' THEN
+    IF v_employee.role <> 'staff' THEN
+      RAISE EXCEPTION 'Managers can manage Staff accounts only. Manager accounts are protected.';
+    END IF;
     IF p_role <> 'staff' THEN
       RAISE EXCEPTION 'Only Admin can appoint Managers';
     END IF;
@@ -401,6 +404,9 @@ BEGIN
   END IF;
   IF v_employee.id IS NULL OR v_employee.role = 'admin' THEN
     RAISE EXCEPTION 'Administrator compensation cannot be managed through Staff Management';
+  END IF;
+  IF v_actor.role = 'manager' AND v_employee.role <> 'staff' THEN
+    RAISE EXCEPTION 'Managers can manage compensation for Staff accounts only';
   END IF;
   IF v_actor.role = 'manager' AND (
     v_actor.manager_scope NOT IN ('company', 'department')
