@@ -17,6 +17,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci --prefix backend
+      - name: Run security and integration contract tests
+        run: npm test --prefix backend
       - run: node scripts/check-syntax.js
       - name: Audit production dependencies
         run: npm audit --prefix backend --omit=dev --audit-level=moderate
