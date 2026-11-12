@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS public.employee_compensation (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS employee_compensation_one_current_uidx
   ON public.employee_compensation(profile_id) WHERE effective_to IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS employee_compensation_profile_effective_date_uidx
+  ON public.employee_compensation(profile_id, effective_from);
 CREATE INDEX IF NOT EXISTS employee_compensation_profile_date_idx
   ON public.employee_compensation(profile_id, effective_from DESC);
 
@@ -373,6 +375,7 @@ DECLARE
   v_actor public.profiles%ROWTYPE;
   v_employee public.profiles%ROWTYPE;
   v_current public.employee_compensation%ROWTYPE;
+  v_next_effective_from date;
   v_result public.employee_compensation%ROWTYPE;
 BEGIN
   SELECT * INTO v_actor FROM public.profiles WHERE id = (SELECT auth.uid());
@@ -401,10 +404,19 @@ BEGIN
     RAISE EXCEPTION 'Invalid pay frequency';
   END IF;
 
-  SELECT * INTO v_current FROM public.employee_compensation
-    WHERE profile_id = p_employee_id AND effective_to IS NULL FOR UPDATE;
-  IF FOUND AND p_effective_from = v_current.effective_from THEN
-    -- Same-day corrections update the current or scheduled row in place.
+  -- Lock the employee row above to serialize all compensation timeline edits.
+  -- Find the interval containing the requested effective date, if any.
+  SELECT * INTO v_current
+    FROM public.employee_compensation
+    WHERE profile_id = p_employee_id
+      AND effective_from <= p_effective_from
+      AND (effective_to IS NULL OR effective_to >= p_effective_from)
+    ORDER BY effective_from DESC
+    LIMIT 1
+    FOR UPDATE;
+
+  IF FOUND AND v_current.effective_from = p_effective_from THEN
+    -- Same-day correction replaces the row for that exact effective date.
     UPDATE public.employee_compensation
       SET base_salary = p_base_salary,
           currency_code = p_currency_code,
@@ -417,20 +429,43 @@ BEGIN
   END IF;
 
   IF FOUND THEN
-    IF p_effective_from < v_current.effective_from THEN
-      RAISE EXCEPTION 'New salary effective date must not precede the existing scheduled salary';
-    END IF;
+    -- Split the interval at the new effective date; retain its previous end.
     UPDATE public.employee_compensation
       SET effective_to = p_effective_from - 1
       WHERE id = v_current.id;
+  ELSE
+    -- If the new date is after the final open-ended interval, close that interval.
+    SELECT * INTO v_current
+      FROM public.employee_compensation
+      WHERE profile_id = p_employee_id
+        AND effective_to IS NULL
+        AND effective_from < p_effective_from
+      ORDER BY effective_from DESC
+      LIMIT 1
+      FOR UPDATE;
+    IF FOUND THEN
+      UPDATE public.employee_compensation
+        SET effective_to = p_effective_from - 1
+        WHERE id = v_current.id;
+    END IF;
   END IF;
+
+  -- Bound the new interval by the next scheduled record, if one exists.
+  SELECT effective_from INTO v_next_effective_from
+    FROM public.employee_compensation
+    WHERE profile_id = p_employee_id
+      AND effective_from > p_effective_from
+    ORDER BY effective_from
+    LIMIT 1;
 
   INSERT INTO public.employee_compensation(
     profile_id, base_salary, currency_code, pay_frequency,
-    effective_from, notes, created_by
+    effective_from, effective_to, notes, created_by
   ) VALUES (
     p_employee_id, p_base_salary, p_currency_code, p_pay_frequency,
-    p_effective_from, NULLIF(btrim(COALESCE(p_notes, '')), ''), (SELECT auth.uid())
+    p_effective_from,
+    CASE WHEN v_next_effective_from IS NULL THEN NULL ELSE v_next_effective_from - 1 END,
+    NULLIF(btrim(COALESCE(p_notes, '')), ''), (SELECT auth.uid())
   )
   RETURNING * INTO v_result;
 
