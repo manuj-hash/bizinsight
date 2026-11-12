@@ -124,6 +124,8 @@ async function loadStaff(){
   staff.forEach(person=>{
    const row=body.insertRow();
    cell(row,person.full_name);
+   cell(row,person.email);
+   cell(row,person.phone);
    cell(row,person.role==="admin"?"Admin":person.role==="manager"?(person.manager_scope==="company"?"Overall Manager":"Department Manager"):"General Staff");
    cell(row,person.department_name);
    cell(row,person.designation);

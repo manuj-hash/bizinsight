@@ -1,7 +1,7 @@
-const crypto = require("crypto");
 const { getAdminClient } = require("../config/supabase");
 
 const adminClient = () => getAdminClient();
+const { validateCompensationInput } = require("../utils/compensationValidation");
 const managerCanAccessDepartment = (profile, departmentId) =>
     profile.role === "admin" ||
     (profile.role === "manager" && (
@@ -18,23 +18,34 @@ const getStaff = async (req, res) => {
 
         if (req.profile.role === "staff") return res.status(403).json({ message: "Staff accounts cannot browse employee management records" });
         if (req.profile.role === "manager") {
-            query = query.neq("role", "admin");
+            query = query.eq("role", "staff");
             if (req.profile.manager_scope === "department") {
                 query = query.eq("department_id", req.profile.department_id);
             }
         }
 
+        let departmentQuery = db.from("departments").select("id,name,is_active").order("name");
+        if (req.profile.role === "manager" && req.profile.manager_scope === "department") {
+            departmentQuery = departmentQuery.eq("id", req.profile.department_id);
+        }
+
         const [{ data: staff, error }, { data: departments, error: departmentError }] = await Promise.all([
             query,
-            db.from("departments").select("id,name,is_active").order("name")
+            departmentQuery
         ]);
         if (error) throw error;
         if (departmentError) throw departmentError;
 
         const staffRows = staff || [];
-        const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        if (authUsersError) throw authUsersError;
-        const emailById = new Map((authUsers.users || []).map(user => [user.id, user.email || null]));
+        const emailById = new Map();
+        const perPage = 1000;
+        for (let page = 1; ; page += 1) {
+            const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page, perPage });
+            if (authUsersError) throw authUsersError;
+            const users = authUsers.users || [];
+            users.forEach(user => emailById.set(user.id, user.email || null));
+            if (users.length < perPage) break;
+        }
         const ids = staffRows.map(person => person.id);
         let compensation = [];
         const canViewCompensation = req.profile.role === "admin" ||
@@ -43,7 +54,8 @@ const getStaff = async (req, res) => {
             const result = await db.from("employee_compensation")
                 .select("id,profile_id,base_salary,currency_code,pay_frequency,effective_from,effective_to")
                 .in("profile_id", ids)
-                .is("effective_to", null);
+                .lte("effective_from", new Date().toISOString().slice(0, 10))
+                .or(`effective_to.is.null,effective_to.gte.${new Date().toISOString().slice(0, 10)}`);
             if (result.error) throw result.error;
             compensation = result.data || [];
         }
@@ -63,8 +75,13 @@ const getStaff = async (req, res) => {
 };
 
 const inviteEmployee = async (req, res) => {
+    let db;
+    let invitedUserId = null;
     try {
-        if (!["admin", "manager"].includes(req.profile.role)) return res.status(403).json({ message: "Only Admin or an authorized Manager can invite employees" });
+        if (!["admin", "manager"].includes(req.profile.role)) {
+            return res.status(403).json({ message: "Only Admin or an authorized Manager can invite employees" });
+        }
+
         const full_name = String(req.body.full_name || "").trim();
         const email = String(req.body.email || "").trim().toLowerCase();
         const phone = String(req.body.phone || "").trim();
@@ -80,24 +97,36 @@ const inviteEmployee = async (req, res) => {
         if (req.profile.role === "manager" && role !== "staff") {
             return res.status(403).json({ message: "Only Admin can appoint Managers" });
         }
+        if (role === "staff" && !departmentId) {
+            return res.status(400).json({ message: "Select a department for this employee" });
+        }
         if (req.profile.role === "manager" && req.profile.manager_scope === "department" &&
             departmentId !== req.profile.department_id) {
             return res.status(403).json({ message: "You can add staff only to your department" });
         }
-        if (role === "staff" && !departmentId) {
-            return res.status(400).json({ message: "Select a department for this employee" });
+        if (role === "manager" && !["company", "department"].includes(scope)) {
+            return res.status(400).json({ message: "Select a valid Manager scope" });
+        }
+        if (role === "manager" && scope === "company" && (departmentId || reportsTo)) {
+            return res.status(400).json({ message: "A company-wide Manager cannot be assigned to a department or reporting Manager" });
         }
 
-        const db = adminClient();
-        const { data, error } = await db.auth.admin.inviteUserByEmail(email, {
+        db = adminClient();
+        if (departmentId) {
+            const { data: department, error: departmentError } = await db.from("departments")
+                .select("id").eq("id", departmentId).eq("is_active", true).maybeSingle();
+            if (departmentError) throw departmentError;
+            if (!department) return res.status(400).json({ message: "Select an active department" });
+        }
+
+        const { data: data, error } = await db.auth.admin.inviteUserByEmail(email, {
             data: { full_name, phone }
         });
         if (error) throw error;
+        invitedUserId = data.user.id;
 
-        // The auth.users trigger creates the base profile synchronously.
-        const { data: assigned, error: assignError } = await db.rpc("admin_set_bizinsight_employee", {
-            p_actor_id: req.user.id,
-            p_employee_id: data.user.id,
+        const { data: assigned, error: assignError } = await req.supabase.rpc("admin_set_bizinsight_employee", {
+            p_employee_id: invitedUserId,
             p_role: role,
             p_department_id: departmentId,
             p_designation: designation || null,
@@ -106,11 +135,18 @@ const inviteEmployee = async (req, res) => {
         });
         if (assignError) throw assignError;
 
+        invitedUserId = null;
         return res.status(201).json({
             message: role === "manager" ? "Manager invitation sent." : "Staff invitation sent.",
             employee: { id: data.user.id, full_name, role: assigned.role, department_id: assigned.department_id }
         });
     } catch (error) {
+        if (invitedUserId && db) {
+            const { error: cleanupError } = await db.auth.admin.deleteUser(invitedUserId);
+            if (cleanupError) {
+                console.error("Failed to clean up incomplete invited account:", cleanupError.message);
+            }
+        }
         console.error("Staff invitation error:", error.message);
         return res.status(400).json({ message: error.message || "Unable to invite employee" });
     }
@@ -125,26 +161,36 @@ const updateEmployee = async (req, res) => {
         if (targetError) throw targetError;
         if (!target) return res.status(404).json({ message: "Employee not found" });
         if (target.role === "admin") return res.status(403).json({ message: "Admin accounts cannot be managed here" });
+        if (req.profile.role === "manager" && target.role !== "staff") {
+            return res.status(403).json({ message: "Managers can manage Staff accounts only. Manager accounts are protected." });
+        }
 
-        const departmentId = req.body.department_id === undefined ? target.department_id : req.body.department_id;
+        const role = req.body.role || target.role;
+        const managerScope = role === "manager"
+            ? (req.body.manager_scope || target.manager_scope)
+            : null;
+        let departmentId = req.body.department_id === undefined ? target.department_id : req.body.department_id;
+
+        if (role === "manager" && managerScope === "company") {
+            departmentId = null;
+        }
+        if (req.profile.role === "manager" && role !== "staff") {
+            return res.status(403).json({ message: "Only Admin can appoint or change Managers" });
+        }
         if (!managerCanAccessDepartment(req.profile, target.department_id) ||
             !managerCanAccessDepartment(req.profile, departmentId)) {
             return res.status(403).json({ message: "You cannot manage employees outside your department" });
         }
 
-        const role = req.body.role || target.role;
-        if (req.profile.role === "manager" && role !== "staff") {
-            return res.status(403).json({ message: "Only Admin can appoint or change Managers" });
-        }
-
-        const { data, error } = await db.rpc("admin_set_bizinsight_employee", {
-            p_actor_id: req.user.id,
+        const { data, error } = await req.supabase.rpc("admin_set_bizinsight_employee", {
             p_employee_id: req.params.id,
             p_role: role,
             p_department_id: departmentId,
             p_designation: req.body.designation === undefined ? (target.designation || null) : String(req.body.designation).trim(),
-            p_manager_scope: role === "manager" ? (req.body.manager_scope || target.manager_scope) : null,
-            p_reports_to: role === "manager" ? (req.body.reports_to || target.reports_to || null) : (req.profile.role === "manager" ? req.user.id : null)
+            p_manager_scope: managerScope,
+            p_reports_to: role === "manager"
+                ? (managerScope === "company" ? null : (req.body.reports_to || target.reports_to || null))
+                : (req.profile.role === "manager" ? req.user.id : null)
         });
         if (error) throw error;
         return res.json({ message: "Staff record updated.", employee: data });
@@ -234,8 +280,7 @@ const getPreferences = async (req, res) => {
 
 const updatePreferences = async (req, res) => {
     try {
-        const { data, error } = await adminClient().rpc("update_bizinsight_preferences", {
-            p_actor_id: req.user.id,
+        const { data, error } = await req.supabase.rpc("update_bizinsight_preferences", {
             p_management_mode: req.profile.role === "admin" ? (req.body.management_mode || null) : null,
             p_frequent_customer_min_orders: req.body.frequent_customer_min_orders ?? null,
             p_high_value_customer_amount: req.body.high_value_customer_amount ?? null
@@ -249,17 +294,15 @@ const updatePreferences = async (req, res) => {
 
 const updateCompensation = async (req, res) => {
     try {
-        const salary = Number(req.body.base_salary);
-        if (!Number.isFinite(salary) || salary < 0) {
-            return res.status(400).json({ message: "Enter a valid non-negative salary" });
-        }
-        const { data, error } = await adminClient().rpc("set_bizinsight_employee_compensation", {
-            p_actor_id: req.user.id,
+        const validation = validateCompensationInput(req.body);
+        if (!validation.valid) return res.status(400).json({ message: validation.message });
+        const { salary, currencyCode, payFrequency, effectiveFrom } = validation;
+        const { data, error } = await req.supabase.rpc("set_bizinsight_employee_compensation", {
             p_employee_id: req.params.id,
             p_base_salary: salary,
-            p_currency_code: String(req.body.currency_code || "INR").toUpperCase(),
-            p_pay_frequency: req.body.pay_frequency || "monthly",
-            p_effective_from: req.body.effective_from || new Date().toISOString().slice(0, 10),
+            p_currency_code: currencyCode,
+            p_pay_frequency: payFrequency,
+            p_effective_from: effectiveFrom,
             p_notes: req.body.notes || null
         });
         if (error) throw error;
