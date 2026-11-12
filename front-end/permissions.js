@@ -74,6 +74,18 @@ async function init(){
    location.replace(first||"profile.html");
    return;
   }
+  if(admin||granted.has("communication.access")){
+   const refreshUnread=async()=>{
+    try{
+     const nr=await fetch("/api/communication/notifications",{headers:{Authorization:"Bearer "+token()}});
+     if(!nr.ok)return;
+     const notes=await nr.json();const count=notes.filter(n=>!n.read_at).length;
+     const link=document.querySelector('.sidebar a[href="communication.html"]');
+     if(link)link.textContent=count?"Communication ("+count+")":"Communication";
+    }catch(_){}
+   };
+   refreshUnread();setInterval(refreshUnread,30000);
+  }
   window.bizInsightAccess={role:data.role,permissions:granted,delegations:data.delegations||[]};
   applyActionVisibility(granted,admin);
   if(!window.__bizInsightPermissionObserver){window.__bizInsightPermissionObserver=new MutationObserver(()=>applyActionVisibility(granted,admin));window.__bizInsightPermissionObserver.observe(document.body,{childList:true,subtree:true});}
