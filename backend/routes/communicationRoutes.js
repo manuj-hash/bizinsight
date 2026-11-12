@@ -5,6 +5,7 @@ const c=require("../controllers/communicationController");
 router.use(protect);
 router.get("/messages",c.listMessages);
 router.get("/departments",c.listAnnouncementDepartments);
+router.get("/department-members",c.listDepartmentMembers);
 router.get("/notifications",c.listNotifications);
 router.patch("/notifications/:id/read",c.markNotificationRead);
 router.post("/messages",c.createMessage);
