@@ -136,21 +136,12 @@ CREATE POLICY "Permissioned users read products"
     OR private.has_bizinsight_permission('analytics.view')
     OR private.has_bizinsight_permission('dashboard.view')
   );
-CREATE POLICY "Permissioned users create products"
-  ON public.products FOR INSERT TO authenticated
-  WITH CHECK (private.has_bizinsight_permission('inventory.create'));
-CREATE POLICY "Permissioned users update products"
-  ON public.products FOR UPDATE TO authenticated
-  USING (private.has_bizinsight_permission('inventory.update'))
-  WITH CHECK (private.has_bizinsight_permission('inventory.update'));
-
+-- All product mutations must pass through Express controllers and the
+-- audited stock-movement workflow; the browser Data API is read-only.
+DROP POLICY IF EXISTS "Permissioned users create products" ON public.products;
+DROP POLICY IF EXISTS "Permissioned users update products" ON public.products;
 GRANT SELECT ON public.products TO authenticated;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.products FROM authenticated;
--- Stock and archive flags are never writable through the browser Data API.
-GRANT INSERT (sku, name, description, category, price, cost_price, reorder_level)
-  ON public.products TO authenticated;
-GRANT UPDATE (sku, name, description, category, price, cost_price, reorder_level)
-  ON public.products TO authenticated;
 
 -- Orders and line items are read-only through the Data API. All order writes
 -- must go through the atomic, server-side order lifecycle RPCs.
