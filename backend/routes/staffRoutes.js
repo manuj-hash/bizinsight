@@ -10,7 +10,7 @@ router.put("/:id/compensation",requirePermission("staff.compensation.manage"),st
 router.get("/departments",requirePermission("staff.view","staff.manage"),staff.getDepartments);
 router.post("/departments",requirePermission("staff.departments.manage"),staff.createDepartment);
 router.patch("/departments/:id",requirePermission("staff.departments.manage"),staff.updateDepartment);
-router.get("/preferences",requirePermission("staff.view"),staff.getPreferences);
+router.get("/preferences",requirePermission("staff.view","staff.manage"),staff.getPreferences);
 router.patch("/preferences",requirePermission("staff.departments.manage"),staff.updatePreferences);
 router.patch("/:id",requirePermission("staff.manage"),staff.updateEmployee);
 module.exports=router;
