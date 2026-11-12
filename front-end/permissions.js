@@ -8,7 +8,7 @@ const pageMap={
  "customers.html":["customers.view"],
  "analytics.html":["analytics.view","inventory.view"],
  "reports.html":["reports.view"],
- "staff.html":["staff.view","staff.manage"],
+ "staff.html":["staff.view"],
  "access-control.html":["staff.view"],
  "communication.html":["communication.access"],
  "profile.html":[]
@@ -17,7 +17,7 @@ const hrefPermission={
  "dashboard.html":["dashboard.view"],"inventory.html":["inventory.view"],
  "orders.html":["orders.view"],"customers.html":["customers.view"],
  "analytics.html":["analytics.view","inventory.view"],"reports.html":["reports.view"],
- "staff.html":["staff.view","staff.manage"],"access-control.html":["staff.view","staff.manage"],
+ "staff.html":["staff.view","staff.manage"],"access-control.html":["staff.view"],
  "communication.html":["communication.access"]
 };
 function hasAny(list,granted){return list.some(code=>granted.has(code));}
