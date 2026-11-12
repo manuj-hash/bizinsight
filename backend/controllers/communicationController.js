@@ -22,7 +22,7 @@ const listMessages = async (req,res) => {
         const {data,error}=await query;
         if(error)throw error;
         const visible=(data||[]).filter(m=>m.message_type==="team"
-            ? req.profile.role==="admin" || m.department_id===req.profile.department_id
+            ? req.profile.role==="admin" || (req.permissions.has("communication.team") && m.department_id===req.profile.department_id)
             : req.profile.role==="admin" || (req.profile.department_id && (m.target_department_ids||[]).includes(req.profile.department_id)));
         return res.json(visible);
     }catch(error){console.error("Messages:",error.message);return res.status(500).json({message:"Unable to load communication messages"});}
