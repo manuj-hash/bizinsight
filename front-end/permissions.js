@@ -47,6 +47,50 @@ function denyAccess(message,granted){
  location.replace(fallback||"profile.html");
 }
 function hasAny(list,granted){return list.some(code=>granted.has(code));}
+
+function setupAccessNotifications(){
+ const existing=document.getElementById("bizinsight-access-notifications");
+ if(existing)return;
+ const wrap=document.createElement("div");wrap.id="bizinsight-access-notifications";
+ wrap.style.cssText="position:fixed;top:16px;right:16px;z-index:9990;font:14px Arial,sans-serif;color:#1f2937";
+ const button=document.createElement("button");button.type="button";button.textContent="Access alerts";
+ button.setAttribute("aria-expanded","false");button.style.cssText="padding:10px 14px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#1d4ed8;font-weight:600;box-shadow:0 3px 12px #0f172a18;cursor:pointer";
+ const count=document.createElement("span");count.style.cssText="margin-left:8px;padding:2px 7px;border-radius:12px;background:#fee2e2;color:#991b1b";count.hidden=true;button.appendChild(count);
+ const panel=document.createElement("section");panel.hidden=true;panel.setAttribute("aria-label","Access notifications");panel.style.cssText="position:absolute;right:0;top:48px;width:min(380px,calc(100vw - 32px));max-height:65vh;overflow:auto;padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 36px #0f172a24";
+ const heading=document.createElement("h2");heading.textContent="Access notifications";heading.style.cssText="font-size:16px;margin:0 0 10px";
+ const list=document.createElement("div");panel.append(heading,list);wrap.append(button,panel);document.body.appendChild(wrap);
+ button.addEventListener("click",()=>{panel.hidden=!panel.hidden;button.setAttribute("aria-expanded",String(!panel.hidden));if(!panel.hidden)refresh();});
+ async function refresh(){
+  try{
+   const response=await fetch("/api/permissions/notifications",{headers:{Authorization:"Bearer "+token()}});
+   if(!response.ok)return;
+   const items=await response.json();const unread=items.filter(item=>!item.read_at).length;
+   count.textContent=String(unread);count.hidden=unread===0;
+   list.replaceChildren();
+   if(!items.length){const empty=document.createElement("p");empty.textContent="You have no access notifications.";list.appendChild(empty);return;}
+   items.forEach(item=>{
+    const card=document.createElement("article");card.style.cssText="padding:10px 0;border-top:1px solid #e5e7eb";
+    const title=document.createElement("strong");title.textContent=item.title;
+    const message=document.createElement("p");message.textContent=item.message;message.style.cssText="margin:5px 0;color:#475569;line-height:1.45";
+    const meta=document.createElement("small");meta.textContent=new Date(item.created_at).toLocaleString("en-IN");meta.style.color="#64748b";
+    card.append(title,message,meta);
+    if(!item.read_at){
+     const mark=document.createElement("button");mark.type="button";mark.textContent="Mark as read";mark.style.cssText="display:block;margin-top:7px;padding:5px 9px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer";
+     mark.addEventListener("click",async()=>{
+      try{const result=await fetch("/api/permissions/notifications/"+encodeURIComponent(item.id)+"/read",{method:"PATCH",headers:{Authorization:"Bearer "+token()}});
+       if(!result.ok)throw new Error("Unable to update notification.");
+       await refresh();
+      }catch(error){showAccessNotice(error.message);}
+     });
+     card.appendChild(mark);
+    }
+    list.appendChild(card);
+   });
+  }catch(error){console.error("Access notifications:",error);}
+ }
+ refresh();setInterval(refresh,30000);
+}
+
 function applyActionVisibility(granted,admin){
  const can=code=>admin||granted.has(code);
  const hide=(node,condition)=>{if(node&&node.hidden!==condition)node.hidden=condition;};
@@ -120,6 +164,7 @@ async function init(){
    refreshUnread();setInterval(refreshUnread,30000);
   }
   window.bizInsightAccess={role:data.role,permissions:granted,delegations:data.delegations||[]};
+  setupAccessNotifications();
   applyActionVisibility(granted,admin);
   if(!window.__bizInsightPermissionObserver){window.__bizInsightPermissionObserver=new MutationObserver(()=>applyActionVisibility(granted,admin));window.__bizInsightPermissionObserver.observe(document.body,{childList:true,subtree:true});}
   document.dispatchEvent(new CustomEvent("bizinsight:access-ready",{detail:window.bizInsightAccess}));
