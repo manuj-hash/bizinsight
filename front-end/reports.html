@@ -14,10 +14,10 @@
     <a href="dashboard.html">🏠 Dashboard</a>
     <a href="inventory.html">📦 Inventory</a>
     <a href="orders.html">Sales & Orders</a>
-    <a href="customers.html">Customers</a>
+    <a href="customers.html" id="customersNavLink">Customers</a>
     <a href="analytics.html">📊 Analytics</a>
     <a href="reports.html" class="active">📄 Reports</a>
-    <a href="users.html" id="adminUsersLink">User Management</a>
+    <a href="staff.html" id="staffNavLink">Staff Management</a>
     <a href="profile.html">👤 Profile</a>
     <a href="index.html" class="lout" onclick="logout()">🚪 Logout</a>
 </div>
@@ -409,6 +409,20 @@ try {
     const adminLink = document.getElementById("adminUsersLink");
     if (adminLink) adminLink.hidden = true;
 }
+</script>
+<script>
+(function(){
+ try {
+  const navUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+  if(!["admin","manager"].includes(navUser.role)){
+   const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+   const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+  }
+ } catch (_) {
+  const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+  const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+ }
+})();
 </script>
 </body>
 </html>
