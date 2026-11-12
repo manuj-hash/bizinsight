@@ -42,8 +42,11 @@ const createMessage = async (req,res) => {
         }else{
             if(!has(req,"communication.general.publish"))return res.status(403).json({message:"General announcement publishing is not granted"});
             if(req.profile.role!=="admin"){
+                const publisherDepartment=req.body.publisher_department_id||req.profile.department_id;
+                if(!publisherDepartment||(req.profile.manager_scope!=="company"&&publisherDepartment!==req.profile.department_id))
+                    return res.status(403).json({message:"Choose an authorized publishing department"});
                 const {data:responsibility,error}=await db.from("communication_responsibilities").select("active_publisher_user_id")
-                    .eq("department_id",req.profile.department_id).maybeSingle();
+                    .eq("department_id",publisherDepartment).maybeSingle();
                 if(error)throw error;
                 if(!responsibility||responsibility.active_publisher_user_id!==req.user.id)
                     return res.status(403).json({message:"Only the currently assigned primary or activated backup communicator can publish general announcements"});
