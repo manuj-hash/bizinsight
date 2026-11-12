@@ -4,6 +4,8 @@ const protect=require("../middleware/authMiddleware");
 const c=require("../controllers/communicationController");
 router.use(protect);
 router.get("/messages",c.listMessages);
+router.get("/notifications",c.listNotifications);
+router.patch("/notifications/:id/read",c.markNotificationRead);
 router.post("/messages",c.createMessage);
 router.get("/issues",c.listIssues);
 router.post("/issues",c.createIssue);
