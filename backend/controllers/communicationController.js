@@ -149,11 +149,9 @@ const listComplaints=async(req,res)=>{
         const db=getAdminClient();
         let query=db.from("communication_complaints").select("*").order("created_at",{ascending:false}).limit(200);
         if(req.profile.role==="staff")query=query.eq("submitted_by",req.user.id);
-        else if(req.profile.role==="manager"&&!has(req,"communication.complaints.review"))
-            query=query.eq("submitted_by",req.user.id);
-        else if(req.profile.role==="manager"&&req.profile.manager_scope==="department")
+        else if(req.profile.role==="manager"&&has(req,"communication.complaints.review")&&req.profile.manager_scope==="department")
             query=query.eq("department_id",req.profile.department_id).eq("recipient_role","manager");
-        else if(req.profile.role==="manager")query=query.eq("recipient_role","admin");
+        else if(req.profile.role==="manager")query=query.eq("submitted_by",req.user.id);
         const {data,error}=await query;if(error)throw error;return res.json(data||[]);
     }catch(error){console.error("Complaints:",error.message);return res.status(500).json({message:"Unable to load complaints"});}
 };
@@ -190,6 +188,43 @@ const listResponsibilities=async(req,res)=>{
         if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("department_id",req.profile.department_id);
         const {data,error}=await query;if(error)throw error;return res.json(data||[]);
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
+};
+
+const complaintCanReview=async(db,actor,complaint)=>{
+    if(actor.role==="admin")return true;
+    return actor.role==="manager"&&actor.manager_scope==="department"&&
+        actor.department_id===complaint.department_id&&complaint.recipient_role==="manager";
+};
+const updateComplaint=async(req,res)=>{
+    try{
+        const db=getAdminClient();
+        const {data:complaint,error:findError}=await db.from("communication_complaints")
+            .select("id,department_id,recipient_role").eq("id",req.params.id).maybeSingle();
+        if(findError)throw findError;if(!complaint)return res.status(404).json({message:"Complaint not found"});
+        if(!has(req,"communication.complaints.review")||!(await complaintCanReview(db,req.profile,complaint)))
+            return res.status(403).json({message:"You are not authorized to review this confidential complaint"});
+        const status=req.body.status;
+        if(!["under_review","resolved","closed"].includes(status))return res.status(400).json({message:"Invalid complaint status"});
+        const {data,error}=await db.from("communication_complaints").update({status,updated_at:new Date().toISOString()})
+            .eq("id",req.params.id).select().single();
+        if(error)throw error;return res.json({message:"Complaint status updated",complaint:data});
+    }catch(error){console.error("Complaint update:",error.message);return res.status(400).json({message:error.message||"Unable to update complaint"});}
+};
+const addComplaintResponse=async(req,res)=>{
+    try{
+        const db=getAdminClient();
+        const {data:complaint,error:findError}=await db.from("communication_complaints")
+            .select("id,department_id,recipient_role").eq("id",req.params.id).maybeSingle();
+        if(findError)throw findError;if(!complaint)return res.status(404).json({message:"Complaint not found"});
+        if(!has(req,"communication.complaints.review")||!(await complaintCanReview(db,req.profile,complaint)))
+            return res.status(403).json({message:"You are not authorized to respond to this confidential complaint"});
+        const body=String(req.body.body||"").trim();
+        if(body.length<2||body.length>3000)return res.status(400).json({message:"Response must contain 2–3000 characters"});
+        const {data,error}=await db.from("communication_complaint_responses").insert({
+            complaint_id:complaint.id,responder_id:req.user.id,body
+        }).select().single();
+        if(error)throw error;return res.status(201).json({message:"Confidential response added",response:data});
+    }catch(error){console.error("Complaint response:",error.message);return res.status(400).json({message:error.message||"Unable to add response"});}
 };
 
 const listDepartmentMembers=async(req,res)=>{
@@ -246,4 +281,4 @@ const markNotificationRead=async(req,res)=>{
     }catch(error){return res.status(400).json({message:"Unable to update notification"});}
 };
 
-module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets,listDepartmentMembers};
+module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets,listDepartmentMembers,updateComplaint,addComplaintResponse};
