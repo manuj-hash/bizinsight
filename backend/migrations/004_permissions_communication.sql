@@ -161,6 +161,20 @@ CREATE TABLE IF NOT EXISTS public.communication_complaint_responses (
 CREATE INDEX IF NOT EXISTS communication_complaint_responses_complaint_idx
   ON public.communication_complaint_responses(complaint_id,created_at);
 
+CREATE TABLE IF NOT EXISTS public.communication_notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  message_id uuid REFERENCES public.communication_messages(id) ON DELETE CASCADE,
+  issue_id uuid REFERENCES public.communication_issues(id) ON DELETE CASCADE,
+  notification_type text NOT NULL CHECK (notification_type IN ('team_message','general_announcement','work_issue')),
+  title text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  read_at timestamptz,
+  CHECK ((message_id IS NOT NULL)::integer + (issue_id IS NOT NULL)::integer = 1)
+);
+CREATE INDEX IF NOT EXISTS communication_notifications_user_unread_idx
+  ON public.communication_notifications(user_id,created_at DESC) WHERE read_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS public.communication_responsibilities (
   department_id uuid PRIMARY KEY REFERENCES public.departments(id) ON DELETE CASCADE,
   primary_user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
@@ -180,7 +194,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'permission_catalog','user_permissions','manager_delegations','permission_audit_logs',
     'communication_messages','communication_issues','communication_complaints',
-    'communication_complaint_responses','communication_responsibilities'
+    'communication_complaint_responses','communication_responsibilities','communication_notifications'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
     EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated',t);
