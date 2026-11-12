@@ -1,6 +1,8 @@
 -- Add supporting indexes for foreign-key columns flagged by Supabase advisors.
 -- Existing indexes are preserved; only missing left-prefix indexes are created.
-DO $$
+BEGIN;
+
+DO $
 DECLARE
   fk record;
   index_name text;
@@ -51,3 +53,5 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+COMMIT;
