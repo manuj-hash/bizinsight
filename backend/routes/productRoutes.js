@@ -1,23 +1,12 @@
-const express = require("express");
-const router = express.Router();
-
-const protect = require("../middleware/authMiddleware");
-const { allowRoles } = protect;
-
-const {
-    getProducts,
-    getProduct,
-    addProduct,
-    updateProduct,
-    deleteProduct
-} = require("../controllers/productController");
-
-router.use(protect, allowRoles("admin", "staff"));
-
-router.get("/", getProducts);
-router.get("/:id", getProduct);
-router.post("/", addProduct);
-router.put("/:id", updateProduct);
-router.delete("/:id", allowRoles("admin"), deleteProduct);
-
-module.exports = router;
+const express=require("express");
+const router=express.Router();
+const protect=require("../middleware/authMiddleware");
+const requirePermission=protect.requirePermission;
+const {getProducts,getProduct,addProduct,updateProduct,deleteProduct}=require("../controllers/productController");
+router.use(protect);
+router.get("/",requirePermission("inventory.view","orders.view","reports.view"),getProducts);
+router.get("/:id",requirePermission("inventory.view"),getProduct);
+router.post("/",requirePermission("inventory.create"),addProduct);
+router.put("/:id",requirePermission("inventory.update"),updateProduct);
+router.delete("/:id",requirePermission("inventory.archive"),deleteProduct);
+module.exports=router;

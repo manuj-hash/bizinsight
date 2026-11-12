@@ -1,18 +1,16 @@
-const express = require("express");
-const router = express.Router();
-const protect = require("../middleware/authMiddleware");
-const { allowRoles } = protect;
-const staff = require("../controllers/staffController");
-
+const express=require("express");
+const router=express.Router();
+const protect=require("../middleware/authMiddleware");
+const requirePermission=protect.requirePermission;
+const staff=require("../controllers/staffController");
 router.use(protect);
-router.get("/", allowRoles("admin", "manager"), staff.getStaff);
-router.post("/invite", allowRoles("admin", "manager"), staff.inviteEmployee);
-router.put("/:id/compensation", allowRoles("admin", "manager"), staff.updateCompensation);
-router.get("/departments", allowRoles("admin", "manager"), staff.getDepartments);
-router.post("/departments", allowRoles("admin", "manager"), staff.createDepartment);
-router.patch("/departments/:id", allowRoles("admin", "manager"), staff.updateDepartment);
-router.get("/preferences", allowRoles("admin", "manager"), staff.getPreferences);
-router.patch("/preferences", allowRoles("admin", "manager"), staff.updatePreferences);
-router.patch("/:id", allowRoles("admin", "manager"), staff.updateEmployee);
-
-module.exports = router;
+router.get("/",requirePermission("staff.view"),staff.getStaff);
+router.post("/invite",requirePermission("staff.manage"),staff.inviteEmployee);
+router.put("/:id/compensation",requirePermission("staff.compensation.manage"),staff.updateCompensation);
+router.get("/departments",requirePermission("staff.view","staff.manage"),staff.getDepartments);
+router.post("/departments",requirePermission("staff.departments.manage"),staff.createDepartment);
+router.patch("/departments/:id",requirePermission("staff.departments.manage"),staff.updateDepartment);
+router.get("/preferences",requirePermission("staff.view"),staff.getPreferences);
+router.patch("/preferences",requirePermission("staff.departments.manage"),staff.updatePreferences);
+router.patch("/:id",requirePermission("staff.manage"),staff.updateEmployee);
+module.exports=router;

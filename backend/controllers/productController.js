@@ -2,9 +2,12 @@ const { getAdminClient } = require("../config/supabase");
 
 const getProducts = async (req, res) => {
     try {
+        const canViewFullInventory = req.profile.role === "admin" ||
+            (req.permissions && (req.permissions.has("inventory.view") || req.permissions.has("reports.view")));
+        const columns = canViewFullInventory ? "*" : "id,sku,name,description,category,price,stock_quantity,reorder_level,is_active,created_at";
         const { data, error } = await req.supabase
             .from("products")
-            .select("*")
+            .select(columns)
             .order("created_at", { ascending: false });
         if (error) throw error;
         return res.status(200).json(data || []);
@@ -16,9 +19,12 @@ const getProducts = async (req, res) => {
 
 const getProduct = async (req, res) => {
     try {
+        const canViewFullInventory = req.profile.role === "admin" ||
+            (req.permissions && (req.permissions.has("inventory.view") || req.permissions.has("reports.view")));
+        const columns = canViewFullInventory ? "*" : "id,sku,name,description,category,price,stock_quantity,reorder_level,is_active,created_at";
         const { data, error } = await req.supabase
             .from("products")
-            .select("*")
+            .select(columns)
             .eq("id", req.params.id)
             .maybeSingle();
         if (error) throw error;

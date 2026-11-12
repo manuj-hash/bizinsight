@@ -132,29 +132,33 @@ async function loadAnalytics() {
         showMessage("Session expired. Please login again.", true);
         return;
     }
-
     try {
+        const access = await fetchAPI("/permissions/me");
+        const granted = new Set(access.permissions || []);
+        if (access.role !== "admin" && !granted.has("analytics.view") && granted.has("inventory.view")) {
+            const inventory = await fetchAPI("/analytics/inventory");
+            document.querySelector(".analytics-cards").innerHTML = `
+                <div class="card"><h3>Total Products</h3><h2>${formatNumber(inventory.totalProducts)}</h2></div>
+                <div class="card"><h3>Low Stock Items</h3><h2>${formatNumber(inventory.lowStockCount)}</h2></div>
+                <div class="card"><h3>Inventory Value</h3><h2>${formatCurrency(inventory.inventoryValue)}</h2></div>`;
+            document.querySelector(".chart-box").hidden = true;
+            document.querySelector(".container > p").textContent = "Inventory performance overview";
+            showMessage("Inventory analytics loaded.");
+            return;
+        }
         const [dashboardData, salesData] = await Promise.all([
             fetchAPI(ANALYTICS_API),
             fetchAPI(SALES_API)
         ]);
-
         displayMetrics(dashboardData);
         displaySalesChart(salesData.monthlySales || []);
-
         showMessage("Analytics loaded successfully.");
-
     } catch (error) {
         showMessage(error.message, true);
-
         document.getElementById("todaySales").textContent = "—";
         document.getElementById("totalOrders").textContent = "—";
         document.getElementById("growth").textContent = "—";
-
-        if (salesChart) {
-            salesChart.destroy();
-            salesChart = null;
-        }
+        if (salesChart) { salesChart.destroy(); salesChart = null; }
     }
 }
 
@@ -238,31 +242,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
 
-<script>
-try {
-    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
-    if (navUser.role !== "admin") {
-        const adminLink = document.getElementById("adminUsersLink");
-        if (adminLink) adminLink.hidden = true;
-    }
-} catch (_) {
-    const adminLink = document.getElementById("adminUsersLink");
-    if (adminLink) adminLink.hidden = true;
-}
-</script>
-<script>
-(function(){
- try {
-  const navUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
-  if(!["admin","manager"].includes(navUser.role)){
-   const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
-   const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
-  }
- } catch (_) {
-  const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
-  const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
- }
-})();
-</script>
+    <script src="permissions.js" defer></script>
 </body>
 </html>

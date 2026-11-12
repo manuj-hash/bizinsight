@@ -16,6 +16,7 @@ const getStaff = async (req, res) => {
             .select("id,full_name,phone,role,department_id,designation,manager_scope,reports_to,created_at,updated_at")
             .order("created_at", { ascending: false });
 
+        if (req.profile.role === "staff") return res.status(403).json({ message: "Staff accounts cannot browse employee management records" });
         if (req.profile.role === "manager") {
             query = query.neq("role", "admin");
             if (req.profile.manager_scope === "department") {
@@ -36,7 +37,9 @@ const getStaff = async (req, res) => {
         const emailById = new Map((authUsers.users || []).map(user => [user.id, user.email || null]));
         const ids = staffRows.map(person => person.id);
         let compensation = [];
-        if (ids.length) {
+        const canViewCompensation = req.profile.role === "admin" ||
+            (req.permissions && req.permissions.has("staff.compensation.view"));
+        if (ids.length && canViewCompensation) {
             const result = await db.from("employee_compensation")
                 .select("id,profile_id,base_salary,currency_code,pay_frequency,effective_from,effective_to")
                 .in("profile_id", ids)
@@ -61,6 +64,7 @@ const getStaff = async (req, res) => {
 
 const inviteEmployee = async (req, res) => {
     try {
+        if (!["admin", "manager"].includes(req.profile.role)) return res.status(403).json({ message: "Only Admin or an authorized Manager can invite employees" });
         const full_name = String(req.body.full_name || "").trim();
         const email = String(req.body.email || "").trim().toLowerCase();
         const phone = String(req.body.phone || "").trim();
@@ -116,7 +120,7 @@ const updateEmployee = async (req, res) => {
     try {
         const db = adminClient();
         const { data: target, error: targetError } = await db.from("profiles")
-            .select("id,role,department_id,manager_scope,reports_to")
+            .select("id,role,department_id,designation,manager_scope,reports_to")
             .eq("id", req.params.id).maybeSingle();
         if (targetError) throw targetError;
         if (!target) return res.status(404).json({ message: "Employee not found" });
@@ -138,7 +142,7 @@ const updateEmployee = async (req, res) => {
             p_employee_id: req.params.id,
             p_role: role,
             p_department_id: departmentId,
-            p_designation: req.body.designation === undefined ? null : String(req.body.designation).trim(),
+            p_designation: req.body.designation === undefined ? (target.designation || null) : String(req.body.designation).trim(),
             p_manager_scope: role === "manager" ? (req.body.manager_scope || target.manager_scope) : null,
             p_reports_to: role === "manager" ? (req.body.reports_to || target.reports_to || null) : (req.profile.role === "manager" ? req.user.id : null)
         });
@@ -152,6 +156,7 @@ const updateEmployee = async (req, res) => {
 
 const getDepartments = async (req, res) => {
     try {
+        if (req.profile.role === "staff") return res.status(403).json({ message: "Department management is not available to Staff accounts" });
         let query = adminClient().from("departments")
             .select("id,name,description,is_active,created_at").order("name");
         if (req.profile.role === "manager" && req.profile.manager_scope === "department") {
@@ -167,6 +172,7 @@ const getDepartments = async (req, res) => {
 
 const createDepartment = async (req, res) => {
     try {
+        if (!["admin", "manager"].includes(req.profile.role)) return res.status(403).json({ message: "Only Admin or an authorized company Manager can create departments" });
         if (req.profile.role === "manager" && req.profile.manager_scope !== "company") {
             return res.status(403).json({ message: "Only Admin or the Overall Manager can create departments" });
         }
