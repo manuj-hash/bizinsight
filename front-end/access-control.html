@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BizInsight | Access Control</title><link rel="stylesheet" href="staff.css"><style>
+.access-wrap{max-width:1100px;margin:24px auto;padding:24px;background:#fff;border-radius:16px;box-shadow:0 8px 28px #17255412}
+.access-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.access-card{border:1px solid #e2e8f0;border-radius:12px;padding:18px}
+.access-card label{display:block;margin:10px 0}.access-card select,.access-card button{padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%}
+.permission-list{max-height:440px;overflow:auto}.permission-row{padding:10px;border-bottom:1px solid #edf2f7;display:flex;gap:10px;align-items:flex-start}
+.permission-row input{margin-top:4px}.permission-row small{display:block;color:#64748b}.actions{display:flex;gap:10px;margin-top:14px}.actions button{cursor:pointer;background:#2563eb;color:white;border:0}.muted{color:#64748b;font-size:13px}
+@media(max-width:800px){.access-grid{grid-template-columns:1fr}.access-wrap{margin:12px;padding:16px}}
+</style></head><body>
+<div class="sidebar"><h2>BizInsight</h2><a href="dashboard.html">Dashboard</a><a href="inventory.html">Inventory</a><a href="orders.html">Sales & Orders</a><a href="customers.html">Customers</a><a href="analytics.html">Analytics</a><a href="reports.html">Reports</a><a href="staff.html">User Management</a><a href="access-control.html" class="active">Access Control</a><a href="profile.html">Profile</a><a href="index.html" id="logoutLink">Logout</a></div>
+<div class="main-content"><main class="access-wrap">
+<h1>Access Control</h1><p class="muted">Admin assigns Manager access and delegation authority. Managers can only grant or deactivate Staff permissions delegated by Admin.</p>
+<div id="status" role="status" class="muted">Loading access controls…</div>
+<div class="access-grid">
+<section class="access-card"><h2>1. Select employee</h2><label for="employee">Employee</label><select id="employee"><option value="">Loading employees…</option></select><div id="employeeInfo" class="muted"></div><h3>Module and action permissions</h3><div id="permissionList" class="permission-list"></div><div class="actions"><button id="savePermissions">Save permissions</button></div></section>
+<section class="access-card" id="delegationCard"><h2>2. Delegate authority to Manager</h2><p class="muted">Only Admin can change delegation. These controls define what a Manager may grant or deactivate for Staff.</p><div id="delegationList" class="permission-list"></div><div class="actions"><button id="saveDelegations">Save Manager delegation</button></div></section>
+</div></main></div>
+<script>
+const API="/api",token=()=>sessionStorage.getItem("bizinsight_token");
+const headers=()=>({Authorization:"Bearer "+token(),"Content-Type":"application/json"});
+let me=null,employees=[],catalog=[],assigned=[],delegations=[],selectedEmployee=null;
+const $=id=>document.getElementById(id);
+function status(message,error=false){$("status").textContent=message;$("status").style.color=error?"#b42318":"#16794b";}
+async function api(path,options={}){const r=await fetch(API+path,{...options,headers:{...headers(),...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"Request failed");return d;}
+function renderPermissions(){
+ const host=$("permissionList");host.replaceChildren();
+ const isAdmin=me.role==="admin";
+ const allowed=isAdmin?catalog.map(p=>p.code):delegations.filter(d=>d.can_grant||d.can_revoke).map(d=>d.permission_code);
+ const active=new Set(assigned.filter(p=>p.is_active).map(p=>p.permission_code));
+ catalog.filter(p=>allowed.includes(p.code)).forEach(p=>{
+  const row=document.createElement("label");row.className="permission-row";
+  const input=document.createElement("input");input.type="checkbox";input.value=p.code;input.checked=active.has(p.code);
+  const text=document.createElement("span");text.textContent=p.label;
+  const detail=document.createElement("small");detail.textContent=p.module_key+" · "+p.code;text.appendChild(detail);
+  row.append(input,text);host.appendChild(row);
+ });
+ if(!host.children.length)host.textContent="No permissions have been delegated to this Manager.";
+}
+function renderDelegations(){
+ const host=$("delegationList");host.replaceChildren();
+ if(me.role!=="admin"){$("delegationCard").hidden=true;return;}
+ const current=new Map(delegations.filter(d=>d.is_active).map(d=>[d.permission_code,d]));
+ catalog.forEach(p=>{
+  const row=document.createElement("div");row.className="permission-row";
+  const box=document.createElement("div");box.style.flex="1";
+  const title=document.createElement("strong");title.textContent=p.label;box.appendChild(title);
+  const grant=document.createElement("label");const g=document.createElement("input");g.type="checkbox";g.dataset.grant=p.code;g.checked=Boolean(current.get(p.code)?.can_grant);grant.append(g,document.createTextNode(" Can grant"));
+  const revoke=document.createElement("label");const v=document.createElement("input");v.type="checkbox";v.dataset.revoke=p.code;v.checked=Boolean(current.get(p.code)?.can_revoke);revoke.append(v,document.createTextNode(" Can deactivate"));
+  box.append(grant,revoke);row.appendChild(box);host.appendChild(row);
+ });
+}
+async function loadEmployee(){
+ const id=$("employee").value;if(!id)return;
+ selectedEmployee=employees.find(e=>e.id===id);$("employeeInfo").textContent=selectedEmployee.full_name+" · "+selectedEmployee.role+" · "+(selectedEmployee.department_id||"Company scope");
+ const data=await api("/permissions/users/"+encodeURIComponent(id));
+ catalog=data.catalog||[];assigned=data.assigned||[];
+ delegations=me.role==="manager"?(data.delegations||[]):delegations;
+ renderPermissions();
+}
+async function init(){
+ if(!token()){location.href="index.html";return;}
+ try{
+  const [access,staff,delegated]=await Promise.all([api("/permissions/me"),api("/staff"),api("/permissions/delegations")]);
+  me=access;employees=staff.filter(e=>e.role!=="admin");
+  catalog=access.catalog||[];delegations=delegated||[];
+  if(me.role==="manager")employees=employees.filter(e=>e.role==="staff");
+  $("employee").replaceChildren();
+  employees.forEach(e=>{const o=document.createElement("option");o.value=e.id;o.textContent=e.full_name+" ("+e.role+")";$("employee").appendChild(o);});
+  if(!employees.length){status("No eligible employees found.",true);return;}
+  $("employee").addEventListener("change",()=>loadEmployee().catch(e=>status(e.message,true)));
+  await loadEmployee();renderDelegations();
+  status("Access controls loaded.");
+ }catch(e){status(e.message,true);}
+}
+$("savePermissions").addEventListener("click",async()=>{
+ try{
+  const id=$("employee").value;if(!id)throw new Error("Select an employee");
+  const checks=[...$("permissionList").querySelectorAll('input[type="checkbox"]')];
+  for(const input of checks){
+   const current=assigned.find(p=>p.permission_code===input.value&&p.is_active);
+   if(input.checked&&!current)await api("/permissions/users/"+id,{method:"POST",body:JSON.stringify({permission_code:input.value,action:"grant"})});
+   if(!input.checked&&current)await api("/permissions/users/"+id,{method:"POST",body:JSON.stringify({permission_code:input.value,action:"revoke"})});
+  }
+  await loadEmployee();status("Permissions saved successfully.");
+ }catch(e){status(e.message,true);}
+});
+$("saveDelegations").addEventListener("click",async()=>{
+ try{
+  const managerId=$("employee").value;if(!managerId||selectedEmployee?.role!=="manager")throw new Error("Select a Manager to configure delegation.");
+  for(const p of catalog){
+   const grant=$("delegationList").querySelector('[data-grant="'+p.code+'"]')?.checked||false;
+   const revoke=$("delegationList").querySelector('[data-revoke="'+p.code+'"]')?.checked||false;
+   const old=delegations.find(d=>d.manager_id===managerId&&d.permission_code===p.code&&d.is_active);
+   if(grant||revoke||old){
+    await api("/permissions/delegations",{method:"PUT",body:JSON.stringify({manager_id:managerId,permission_code:p.code,department_id:selectedEmployee.manager_scope==="company"?null:selectedEmployee.department_id,can_grant:grant,can_revoke:revoke,is_active:grant||revoke})});
+   }
+  }
+  const latest=await api("/permissions/delegations");delegations=latest;renderDelegations();status("Manager delegation saved.");
+ }catch(e){status(e.message,true);}
+});
+$("logoutLink").addEventListener("click",()=>sessionStorage.clear());
+document.addEventListener("DOMContentLoaded",init);
+</script><script src="permissions.js" defer></script></body></html>
