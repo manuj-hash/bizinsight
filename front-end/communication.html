@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BizInsight | Communication</title><link rel="stylesheet" href="staff.css"><style>
+.comm-wrap{max-width:1120px;margin:24px auto;padding:24px;background:#fff;border-radius:16px;box-shadow:0 8px 28px #17255412}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tabs button{padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;cursor:pointer}.tabs button.active{background:#2563eb;color:white;border-color:#2563eb}
+.panel{display:none}.panel.active{display:block}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form-grid .wide{grid-column:1/-1}
+.comm-wrap input,.comm-wrap select,.comm-wrap textarea{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;margin:6px 0 12px}.comm-wrap textarea{min-height:100px;resize:vertical}.primary{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:11px 16px;cursor:pointer}.item{border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin:10px 0}.item h3{margin:0 0 6px}.muted{color:#64748b;font-size:13px}.status{margin:10px 0}.item p{white-space:pre-wrap}.hidden{display:none!important}
+@media(max-width:800px){.comm-wrap{margin:12px;padding:16px}.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}}
+</style></head><body>
+<div class="sidebar"><h2>BizInsight</h2><a href="dashboard.html">Dashboard</a><a href="inventory.html">Inventory</a><a href="orders.html">Sales & Orders</a><a href="customers.html">Customers</a><a href="analytics.html">Analytics</a><a href="reports.html">Reports</a><a href="staff.html">User Management</a><a href="access-control.html">Access Control</a><a href="communication.html" class="active">Communication</a><a href="profile.html">Profile</a><a href="index.html" id="logoutLink">Logout</a></div>
+<div class="main-content"><main class="comm-wrap">
+<h1>Communication</h1><p class="muted">Coordinate department work, notify affected teams and escalate confidential concerns.</p><div id="status" class="status muted" role="status">Loading…</div>
+<nav class="tabs" id="tabs"><button data-tab="team" class="active">Team Communication</button><button data-tab="general">General Announcements</button><button data-tab="issues">Work Issues</button><button data-tab="complaints">Complaints</button><button data-tab="responsibility">Responsibility</button></nav>
+<section id="team" class="panel active"><h2>Department messages</h2><div id="teamList"></div><h3>Send team message</h3><form id="teamForm"><div class="form-grid"><label>Subject<input name="title" required maxlength="160"></label><label>Priority<select name="priority"><option>normal</option><option>high</option><option>urgent</option></select></label><label class="wide">Message<textarea name="body" required maxlength="5000"></textarea></label></div><button class="primary">Send to department</button></form></section>
+<section id="general" class="panel"><h2>General operational announcements</h2><p class="muted">Use this for cross-department notices such as inventory delays affecting Sales.</p><div id="generalList"></div><form id="generalForm"><div class="form-grid"><label>Subject<input name="title" required maxlength="160"></label><label>Priority<select name="priority"><option>normal</option><option>high</option><option>urgent</option></select></label><label class="wide">Receiving departments<select name="target_department_ids" id="targetDepartments" multiple size="4"></select></label><label class="wide">Announcement<textarea name="body" required maxlength="5000"></textarea></label></div><button class="primary">Publish announcement</button></form></section>
+<section id="issues" class="panel"><h2>Operational work issues</h2><div id="issueList"></div><h3>Report an issue</h3><form id="issueForm"><div class="form-grid"><label>Title<input name="title" required maxlength="160"></label><label>Priority<select name="priority"><option>normal</option><option>high</option><option>urgent</option></select></label><label class="wide">What happened?<textarea name="description" required maxlength="5000"></textarea></label></div><button class="primary">Report work issue</button></form></section>
+<section id="complaints" class="panel"><h2>Confidential complaints</h2><p class="muted">Formal complaints are private. Three submissions per calendar month. Serious safety/security concerns should be escalated to Admin outside this limit.</p><div id="complaintList"></div><form id="complaintForm"><div class="form-grid"><label>Person concerned<input name="target_user_id" required placeholder="Employee account ID"></label><label>Category<input name="category" required maxlength="80" placeholder="Work conduct, harassment, etc."></label><label class="wide">Subject<input name="subject" required maxlength="160"></label><label class="wide">Description<textarea name="description" required maxlength="5000"></textarea></label></div><button class="primary">Submit confidential complaint</button></form></section>
+<section id="responsibility" class="panel"><h2>General announcement responsibility</h2><p class="muted">Attendance is not being implemented now. A Manager/Admin can manually switch the active publisher to the backup. Automatic absence-based activation can be added later.</p><div id="responsibilityInfo"></div><form id="responsibilityForm"><div class="form-grid"><label>Primary communicator<input name="primary_user_id" required placeholder="Staff account ID"></label><label>Backup communicator<input name="backup_user_id" required placeholder="Staff account ID"></label><label class="wide"><input type="checkbox" name="activate_backup" style="width:auto"> Activate backup publisher now</label></div><button class="primary">Save responsibility</button></form></section>
+</main></div>
+<script>
+const API="/api",token=()=>sessionStorage.getItem("bizinsight_token"),$=id=>document.getElementById(id);
+let access=null,departments=[];
+function status(m,e=false){$("status").textContent=m;$("status").style.color=e?"#b42318":"#16794b";}
+async function api(path,options={}){const r=await fetch(API+path,{...options,headers:{Authorization:"Bearer "+token(),"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"Request failed");return d;}
+function formData(form){return Object.fromEntries(new FormData(form).entries());}
+function card(host,item,meta){const el=document.createElement("article");el.className="item";const h=document.createElement("h3");h.textContent=item.title||item.subject||meta;const small=document.createElement("div");small.className="muted";small.textContent=meta+" · "+new Date(item.created_at).toLocaleString("en-IN");const p=document.createElement("p");p.textContent=item.body||item.description||item.subject||"";el.append(h,small,p);host.appendChild(el);}
+function showTab(name){document.querySelectorAll(".panel").forEach(x=>x.classList.toggle("active",x.id===name));document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));}
+$("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b)showTab(b.dataset.tab);});
+async function loadMessages(){const items=await api("/communication/messages");$("teamList").replaceChildren();$("generalList").replaceChildren();items.forEach(x=>card(x.message_type==="team"?$("teamList"):$("generalList"),x,x.message_type));}
+async function loadIssues(){const items=await api("/communication/issues");$("issueList").replaceChildren();items.forEach(x=>card($("issueList"),x,x.status+" · "+x.priority));}
+async function loadComplaints(){const items=await api("/communication/complaints");$("complaintList").replaceChildren();items.forEach(x=>card($("complaintList"),x,x.status+" · Confidential"));}
+async function loadResponsibility(){const items=await api("/communication/responsibilities");$("responsibilityInfo").replaceChildren();items.forEach(x=>{const d=document.createElement("div");d.className="item";d.textContent="Department "+x.department_id+" · Primary "+x.primary_user_id+" · Backup "+x.backup_user_id+" · Active publisher "+x.active_publisher_user_id;$("responsibilityInfo").appendChild(d);});}
+function hideTab(name){const b=document.querySelector('[data-tab="'+name+'"]');if(b)b.hidden=true;const panel=$(name);if(panel)panel.hidden=true;}
+async function init(){
+ if(!token()){location.href="index.html";return;}
+ try{
+  access=await api("/permissions/me");const p=new Set(access.permissions||[]),admin=access.role==="admin";
+  if(!admin&&!p.has("communication.team")){hideTab("team");$("teamForm").hidden=true;}
+  if(!admin&&!p.has("communication.general.publish")){hideTab("general");$("generalForm").hidden=true;}
+  if(!admin&&!p.has("communication.issues.access")){hideTab("issues");$("issueForm").hidden=true;}
+  if(!admin&&!p.has("communication.complaints.submit")){hideTab("complaints");$("complaintForm").hidden=true;}
+  if(!admin&&!p.has("communication.responsibility.manage"))hideTab("responsibility");
+  if(!admin&&!p.has("communication.access")&&!p.has("communication.issues.access"))throw new Error("Communication access has not been granted.");
+  try{departments=await api("/staff/departments");}catch(_){departments=[];}
+  departments.forEach(d=>{const o=document.createElement("option");o.value=d.id;o.textContent=d.name;$("targetDepartments").appendChild(o);});
+  const tasks=[];
+  if(admin||p.has("communication.team")||p.has("communication.access"))tasks.push(loadMessages());
+  if(admin||p.has("communication.issues.access"))tasks.push(loadIssues());
+  if(admin||p.has("communication.complaints.submit")||p.has("communication.complaints.review"))tasks.push(loadComplaints());
+  if(admin||p.has("communication.responsibility.manage")||p.has("communication.general.publish"))tasks.push(loadResponsibility());
+  await Promise.all(tasks);status("Communication workspace ready.");
+ }catch(e){status(e.message,true);}
+}
+$("teamForm").addEventListener("submit",async e=>{e.preventDefault();try{await api("/communication/messages",{method:"POST",body:JSON.stringify({...formData(e.target),message_type:"team"})});e.target.reset();await loadMessages();status("Team message sent.");}catch(x){status(x.message,true);}});
+$("generalForm").addEventListener("submit",async e=>{e.preventDefault();try{const v=formData(e.target);v.message_type="general";v.target_department_ids=[...$("targetDepartments").selectedOptions].map(o=>o.value);await api("/communication/messages",{method:"POST",body:JSON.stringify(v)});e.target.reset();await loadMessages();status("General announcement published.");}catch(x){status(x.message,true);}});
+$("issueForm").addEventListener("submit",async e=>{e.preventDefault();try{await api("/communication/issues",{method:"POST",body:JSON.stringify(formData(e.target))});e.target.reset();await loadIssues();status("Work issue reported.");}catch(x){status(x.message,true);}});
+$("complaintForm").addEventListener("submit",async e=>{e.preventDefault();try{await api("/communication/complaints",{method:"POST",body:JSON.stringify(formData(e.target))});e.target.reset();await loadComplaints();status("Confidential complaint submitted.");}catch(x){status(x.message,true);}});
+$("responsibilityForm").addEventListener("submit",async e=>{e.preventDefault();try{const v=formData(e.target);v.activate_backup=e.target.elements.activate_backup.checked;v.department_id=access.department_id;await api("/communication/responsibilities",{method:"PUT",body:JSON.stringify(v)});await loadResponsibility();status("Responsibility updated.");}catch(x){status(x.message,true);}});
+$("logoutLink").addEventListener("click",()=>sessionStorage.clear());
+document.addEventListener("DOMContentLoaded",init);
+</script><script src="permissions.js" defer></script></body></html>
