@@ -16,14 +16,14 @@ const listMessages = async (req,res) => {
             const filters=[];
             if(req.profile.department_id)filters.push("department_id.eq."+req.profile.department_id);
             // General messages are returned only when explicitly targeted to this user's department.
-            if(filters.length)query=query.or(`department_id.eq.${req.profile.department_id},target_department_ids.cs.{${req.profile.department_id}}`);
+            if(req.profile.manager_scope==="company"){} else if(filters.length)query=query.or(`department_id.eq.${req.profile.department_id},target_department_ids.cs.{${req.profile.department_id}}`);
             else query=query.eq("message_type","general").eq("id","00000000-0000-0000-0000-000000000000");
         }
         const {data,error}=await query;
         if(error)throw error;
         const visible=(data||[]).filter(m=>m.message_type==="team"
-            ? req.profile.role==="admin" || (req.permissions.has("communication.team") && m.department_id===req.profile.department_id)
-            : req.profile.role==="admin" || (req.profile.department_id && (m.target_department_ids||[]).includes(req.profile.department_id)));
+            ? req.profile.role==="admin" || (req.permissions.has("communication.team") && (req.profile.manager_scope==="company" || m.department_id===req.profile.department_id))
+            : req.profile.role==="admin" || (req.profile.manager_scope==="company" || (req.profile.department_id && (m.target_department_ids||[]).includes(req.profile.department_id)));
         return res.json(visible);
     }catch(error){console.error("Messages:",error.message);return res.status(500).json({message:"Unable to load communication messages"});}
 };
@@ -81,7 +81,7 @@ const listIssues = async(req,res)=>{
         const db=getAdminClient();
         let query=db.from("communication_issues").select("*").order("created_at",{ascending:false}).limit(200);
         if(req.profile.role==="staff")query=query.or(`department_id.eq.${req.profile.department_id},assigned_to.eq.${req.user.id}`);
-        else if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("department_id",req.profile.department_id);
+        else if(req.profile.role==="staff"||(req.profile.role==="manager"&&req.profile.manager_scope==="department"))query=query.eq("department_id",req.profile.department_id);
         const {data,error}=await query;if(error)throw error;return res.json(data||[]);
     }catch(error){console.error("Issues:",error.message);return res.status(500).json({message:"Unable to load work issues"});}
 };
@@ -160,7 +160,7 @@ const listComplaints=async(req,res)=>{
 
 const setResponsibility=async(req,res)=>{
     try{
-        if(!has(req,"communication.responsibility.manage"))return res.status(403).json({message:"Announcement responsibility management is not granted"});
+        if(!has(req,"communication.responsibility.manage")||!["admin","manager"].includes(req.profile.role))return res.status(403).json({message:"Only Admin or an authorized Manager can manage announcement responsibility"});
         const {department_id,primary_user_id,backup_user_id,activate_backup=false}=req.body;
         if(!department_id||!primary_user_id||!backup_user_id||primary_user_id===backup_user_id)
             return res.status(400).json({message:"Department, primary and backup members are required"});
@@ -196,7 +196,7 @@ const listDepartmentMembers=async(req,res)=>{
     try{
         if(!has(req,"communication.responsibility.manage"))return res.status(403).json({message:"Responsibility management is not granted"});
         const departmentId=req.query.department_id||req.profile.department_id;
-        if(!departmentId||(req.profile.role!=="admin"&&departmentId!==req.profile.department_id))
+        if(!departmentId||(req.profile.role!=="admin"&&req.profile.manager_scope!=="company"&&departmentId!==req.profile.department_id))
             return res.status(403).json({message:"You cannot manage communicators for this department"});
         const {data,error}=await getAdminClient().from("profiles")
             .select("id,full_name,role,department_id").eq("department_id",departmentId)
