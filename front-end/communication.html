@@ -59,6 +59,10 @@ async function loadComplaints(){
   const meta=document.createElement("div");meta.className="muted";meta.textContent=x.status+" · Confidential · "+new Date(x.created_at).toLocaleString("en-IN");
   const p=document.createElement("p");p.textContent=x.description;
   el.append(h,meta,p);
+  const historyButton=document.createElement("button");historyButton.className="primary";historyButton.textContent="View private responses";
+  const history=document.createElement("div");history.hidden=true;
+  historyButton.addEventListener("click",async()=>{try{const responses=await api("/communication/complaints/"+x.id+"/responses");history.replaceChildren();responses.forEach(item=>{const line=document.createElement("p");line.textContent=new Date(item.created_at).toLocaleString("en-IN")+" — "+item.body;history.appendChild(line);});history.hidden=!history.hidden;}catch(e){status(e.message,true);}});
+  el.append(historyButton,history);
   if(canReview){
    const select=document.createElement("select");["under_review","resolved","closed"].forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;select.appendChild(o);});select.value=x.status==="submitted"?"under_review":x.status;
    const save=document.createElement("button");save.className="primary";save.textContent="Update complaint";
