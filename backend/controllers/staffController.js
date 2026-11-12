@@ -18,7 +18,7 @@ const getStaff = async (req, res) => {
 
         if (req.profile.role === "staff") return res.status(403).json({ message: "Staff accounts cannot browse employee management records" });
         if (req.profile.role === "manager") {
-            query = query.neq("role", "admin");
+            query = query.eq("role", "staff");
             if (req.profile.manager_scope === "department") {
                 query = query.eq("department_id", req.profile.department_id);
             }
