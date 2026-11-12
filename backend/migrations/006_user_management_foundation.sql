@@ -159,30 +159,24 @@ GRANT UPDATE (full_name, phone) ON TABLE public.profiles TO authenticated;
 -- 5. RLS and grants for the new tables.
 ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.departments FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON TABLE public.departments TO authenticated;
+-- Department reads go through the Express API, which applies staff.view/staff.manage
+-- and department-scope checks before using the server-side service role.
 GRANT ALL ON TABLE public.departments TO service_role;
 DROP POLICY IF EXISTS "Admins and managers read departments" ON public.departments;
-CREATE POLICY "Admins and managers read departments"
-  ON public.departments FOR SELECT TO authenticated
-  USING ((SELECT private.is_bizinsight_admin_or_manager()));
 
 ALTER TABLE public.company_preferences ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.company_preferences FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON TABLE public.company_preferences TO authenticated;
+-- Preference reads go through the Express API and its role/permission checks.
 GRANT ALL ON TABLE public.company_preferences TO service_role;
 DROP POLICY IF EXISTS "Admins and managers read company preferences" ON public.company_preferences;
-CREATE POLICY "Admins and managers read company preferences"
-  ON public.company_preferences FOR SELECT TO authenticated
-  USING ((SELECT private.is_bizinsight_admin_or_manager()));
 
 ALTER TABLE public.employee_compensation ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.employee_compensation FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON TABLE public.employee_compensation TO authenticated;
+-- Compensation is server-only: Express checks staff.compensation.view/manage
+-- before reading or writing through the service-role client. Do not expose table SELECT
+-- to authenticated users, because a scope-only RLS policy would bypass that permission.
 GRANT ALL ON TABLE public.employee_compensation TO service_role;
 DROP POLICY IF EXISTS "Managers see compensation in their scope" ON public.employee_compensation;
-CREATE POLICY "Managers see compensation in their scope"
-  ON public.employee_compensation FOR SELECT TO authenticated
-  USING ((SELECT private.can_view_employee_compensation(profile_id)));
 
 -- Keep the existing updated_at trigger function used by the live core schema.
 DROP TRIGGER IF EXISTS departments_set_updated_at ON public.departments;
