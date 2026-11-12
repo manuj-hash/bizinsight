@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const { getAdminClient } = require("../config/supabase");
 
 const adminClient = () => getAdminClient();
@@ -156,15 +155,21 @@ const updateEmployee = async (req, res) => {
         if (!target) return res.status(404).json({ message: "Employee not found" });
         if (target.role === "admin") return res.status(403).json({ message: "Admin accounts cannot be managed here" });
 
-        const departmentId = req.body.department_id === undefined ? target.department_id : req.body.department_id;
+        const role = req.body.role || target.role;
+        const managerScope = role === "manager"
+            ? (req.body.manager_scope || target.manager_scope)
+            : null;
+        let departmentId = req.body.department_id === undefined ? target.department_id : req.body.department_id;
+
+        if (role === "manager" && managerScope === "company") {
+            departmentId = null;
+        }
+        if (req.profile.role === "manager" && role !== "staff") {
+            return res.status(403).json({ message: "Only Admin can appoint or change Managers" });
+        }
         if (!managerCanAccessDepartment(req.profile, target.department_id) ||
             !managerCanAccessDepartment(req.profile, departmentId)) {
             return res.status(403).json({ message: "You cannot manage employees outside your department" });
-        }
-
-        const role = req.body.role || target.role;
-        if (req.profile.role === "manager" && role !== "staff") {
-            return res.status(403).json({ message: "Only Admin can appoint or change Managers" });
         }
 
         const { data, error } = await db.rpc("admin_set_bizinsight_employee", {
@@ -173,8 +178,10 @@ const updateEmployee = async (req, res) => {
             p_role: role,
             p_department_id: departmentId,
             p_designation: req.body.designation === undefined ? (target.designation || null) : String(req.body.designation).trim(),
-            p_manager_scope: role === "manager" ? (req.body.manager_scope || target.manager_scope) : null,
-            p_reports_to: role === "manager" ? (req.body.reports_to || target.reports_to || null) : (req.profile.role === "manager" ? req.user.id : null)
+            p_manager_scope: managerScope,
+            p_reports_to: role === "manager"
+                ? (managerScope === "company" ? null : (req.body.reports_to || target.reports_to || null))
+                : (req.profile.role === "manager" ? req.user.id : null)
         });
         if (error) throw error;
         return res.json({ message: "Staff record updated.", employee: data });
