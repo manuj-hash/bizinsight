@@ -66,7 +66,7 @@ async function loadCustomers(){
    const add=value=>{const td=row.insertCell();td.textContent=value==null||value===""?"—":String(value);};
    add(c.name);add(c.email);add(c.phone);
    add(c.qualification_reason==="frequent"?"Frequent customer":c.qualification_reason==="high_value"?"High-value customer":"Qualified");
-   add(c.completed_order_count);
+   add(c.order_count);
    add(Number(c.lifetime_value||0).toLocaleString("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}));
    add(c.created_at?new Date(c.created_at).toLocaleDateString("en-IN"):"—");
   });
