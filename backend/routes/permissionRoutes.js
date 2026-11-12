@@ -7,9 +7,9 @@ const management=require("../controllers/permissionManagementController");
 
 router.use(protect);
 router.get("/me",permissions.catalog);
-router.get("/delegations",allowRoles("admin","manager"),requirePermission("permissions.grant_staff","permissions.revoke_staff"),permissions.getDelegations);
+router.get("/delegations",allowRoles("admin","manager"),permissions.getDelegations);
 router.put("/delegations",allowRoles("admin"),permissions.setDelegation);
 router.get("/users/:id",allowRoles("admin","manager"),requirePermission("staff.view"),management.getStaffPermissions);
-router.post("/users/:id",allowRoles("admin","manager"),requirePermission("permissions.grant_staff","permissions.revoke_staff"),permissions.changeStaffPermission);
+router.post("/users/:id",allowRoles("admin","manager"),permissions.changeStaffPermission);
 
 module.exports=router;
