@@ -11,7 +11,8 @@ BizInsight is a Business Analytics & Decision Support System for small businesse
 - Business analytics
 - Reports and exports
 - Stock movement/history
-- Admin/staff user management
+- Admin/Manager/General Staff management with department scope and salary controls
+- Valuable customer registry with configurable frequent-order/high-value qualification
 - Profile and settings
 
 Future capabilities (not yet implemented): returns/refunds, payment lifecycle, demand forecasting, restock recommendations, and market insights.
@@ -64,3 +65,13 @@ Every implementation phase must update `docs/CHANGELOG.md` with:
 - migration dependency
 - verification performed
 - remaining risks / follow-up
+
+
+## Phase 1.1 agreed role model
+- Admin: organization-wide access; only Admin appoints Managers and changes management structure.
+- Overall Manager: optional one-per-company role with access to all departments granted by Admin.
+- Department Managers: optional multiple managers, one per department, reporting to the Overall Manager in manager-hierarchy mode.
+- General Staff: operational access only; no Customer or Staff Management access.
+- Customer and Staff Management navigation/API access is Admin/Manager only.
+- Salary visibility: Admin and Overall Manager company-wide; Department Manager within their own department; General Staff none.
+- Customer profiles are reserved for frequent or high-value buyers; do not persist non-qualified buyer PII in customer records.
