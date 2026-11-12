@@ -101,7 +101,7 @@ const addProduct = async (req, res) => {
             }
         }
 
-        const { data: savedProduct } = await req.supabase
+        const { data: savedProduct } = await getAdminClient()
             .from("products")
             .select("*")
             .eq("id", product.id)
