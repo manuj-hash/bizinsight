@@ -12,7 +12,7 @@ const validateCompensationInput = (body = {}, today = new Date().toISOString().s
     const payFrequency = body.pay_frequency || "monthly";
     const effectiveFrom = body.effective_from || today;
 
-    if (!/^\d+(?:\\.\d{1,2})?$/.test(salaryText) ||
+    if (!/^\d+(?:\.\d{1,2})?$/.test(salaryText) ||
         !Number.isFinite(salary) || salary < 0 || salary > 999999999999.99) {
         return { valid: false, message: "Enter a valid salary with no more than two decimal places" };
     }
