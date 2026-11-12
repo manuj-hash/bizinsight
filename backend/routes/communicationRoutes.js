@@ -12,6 +12,7 @@ router.get("/issues",c.listIssues);
 router.post("/issues",c.createIssue);
 router.patch("/issues/:id",c.updateIssue);
 router.get("/complaints",c.listComplaints);
+router.get("/complaint-targets",c.listComplaintTargets);
 router.post("/complaints",c.submitComplaint);
 router.get("/responsibilities",c.listResponsibilities);
 router.put("/responsibilities",c.setResponsibility);
