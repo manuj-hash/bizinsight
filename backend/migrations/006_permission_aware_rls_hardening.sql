@@ -98,6 +98,8 @@ CREATE POLICY "Permissioned users read products"
     OR private.has_bizinsight_permission('orders.view')
     OR private.has_bizinsight_permission('orders.create')
     OR private.has_bizinsight_permission('reports.view')
+    OR private.has_bizinsight_permission('analytics.view')
+    OR private.has_bizinsight_permission('dashboard.view')
   );
 CREATE POLICY "Permissioned users create products"
   ON public.products FOR INSERT TO authenticated
@@ -118,6 +120,8 @@ CREATE POLICY "Permissioned users read orders"
   USING (
     private.has_bizinsight_permission('orders.view')
     OR private.has_bizinsight_permission('reports.view')
+    OR private.has_bizinsight_permission('analytics.view')
+    OR private.has_bizinsight_permission('dashboard.view')
   );
 DROP POLICY IF EXISTS "Admins and staff manage order items" ON public.order_items;
 CREATE POLICY "Permissioned users read order items"
@@ -128,7 +132,7 @@ CREATE POLICY "Permissioned users read order items"
   );
 
 GRANT SELECT ON public.orders, public.order_items TO authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.orders, public.order_items FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.orders, public.order_items FROM authenticated;
 
 -- Customer registry is read-only through the Data API; customer recognition
 -- and qualification are handled by the atomic order workflow.
@@ -141,10 +145,12 @@ CREATE POLICY "Permissioned users read valuable customers"
       private.has_bizinsight_permission('customers.view')
       OR private.has_bizinsight_permission('orders.view')
       OR private.has_bizinsight_permission('reports.view')
+      OR private.has_bizinsight_permission('analytics.view')
+      OR private.has_bizinsight_permission('dashboard.view')
     )
   );
 GRANT SELECT ON public.customers TO authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.customers FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.customers FROM authenticated;
 
 -- Inventory history is visible only to users with inventory-view access.
 DROP POLICY IF EXISTS "Staff and admins read inventory movements" ON public.inventory_movements;
@@ -152,7 +158,7 @@ CREATE POLICY "Permissioned users read inventory movements"
   ON public.inventory_movements FOR SELECT TO authenticated
   USING (private.has_bizinsight_permission('inventory.view'));
 GRANT SELECT ON public.inventory_movements TO authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.inventory_movements FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.inventory_movements FROM authenticated;
 
 -- Sensitive management data is served only through Express controllers,
 -- which apply actor, scope and permission checks before using service_role.
