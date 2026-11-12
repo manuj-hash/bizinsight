@@ -1,166 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BizInsight | Customers</title>
-    <link rel="stylesheet" href="inventory.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizInsight | Valuable Customers</title>
+<link rel="stylesheet" href="inventory.css">
+<style>
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:20px 0}
+.metric{background:#fff;padding:18px;border-radius:12px;box-shadow:0 3px 14px rgba(20,35,60,.06)}
+.metric strong{display:block;font-size:24px;margin-top:8px}
+.table-wrap{overflow-x:auto}.table-wrap table{min-width:760px;width:100%;border-collapse:collapse}
+.table-wrap th,.table-wrap td{padding:11px;border-bottom:1px solid #e7ebf0;text-align:left}
+.message{min-height:22px}
+</style>
 </head>
 <body>
 <div class="sidebar">
-    <h2>BizInsight</h2>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="inventory.html">Inventory</a>
-    <a href="orders.html">Sales & Orders</a>
-    <a href="customers.html" class="active">Customers</a>
-    <a href="analytics.html">Analytics</a>
-    <a href="reports.html">Reports</a>
-    <a href="users.html" id="adminUsersLink">User Management</a>
-    <a href="profile.html">Profile</a>
-    <a href="index.html" class="lout" id="logoutLink">Logout</a>
+<h2>BizInsight</h2>
+<a href="dashboard.html">Dashboard</a>
+<a href="inventory.html">Inventory</a>
+<a href="orders.html">Sales & Orders</a>
+<a href="customers.html" class="active" id="customersNavLink">Customers</a>
+<a href="analytics.html">Analytics</a>
+<a href="reports.html">Reports</a>
+<a href="staff.html" id="staffNavLink">Staff Management</a>
+<a href="profile.html">Profile</a>
+<a href="index.html" class="lout" id="logoutLink">Logout</a>
 </div>
-<div class="main-content">
-<div class="container">
-    <h1>Customer Management</h1>
-    <p>Maintain customer details and connect customers with their sales history.</p>
-    <p id="message" role="status" aria-live="polite"></p>
-
-    <section class="form-container">
-        <h3 id="formTitle">Add Customer</h3>
-        <form id="customerForm">
-            <label for="customerName">Full name</label>
-            <input id="customerName" maxlength="150" required>
-            <label for="customerEmail">Email</label>
-            <input id="customerEmail" type="email" maxlength="254">
-            <label for="customerPhone">Phone</label>
-            <input id="customerPhone" type="tel" maxlength="30">
-            <label for="customerAddress">Address</label>
-            <textarea id="customerAddress" rows="2" maxlength="1000"></textarea>
-            <button type="submit" id="saveButton">Add Customer</button>
-            <button type="button" id="cancelButton" hidden>Cancel edit</button>
-        </form>
-    </section>
-
-    <section class="table-container">
-        <h3>Active Customers</h3>
-        <button type="button" id="refreshButton">Refresh</button>
-        <div style="overflow-x:auto">
-            <table>
-                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
-                <tbody id="customersBody"><tr><td colspan="5">Loading customers...</td></tr></tbody>
-            </table>
-        </div>
-    </section>
+<div class="main-content"><div class="container">
+<h1>Valuable Customer Registry</h1>
+<p>Only frequent customers and high-value order customers receive a permanent customer profile.</p>
+<p class="message" id="message" role="status" aria-live="polite"></p>
+<div class="metric-row">
+<div class="metric"><span>Registered valuable customers</span><strong id="customerCount">—</strong></div>
+<div class="metric"><span>Frequent customers</span><strong id="frequentCount">—</strong></div>
+<div class="metric"><span>High-value customers</span><strong id="highValueCount">—</strong></div>
 </div>
-</div>
+<section class="table-container">
+<h2>Qualified customers</h2>
+<button type="button" id="refreshButton">Refresh</button>
+<div class="table-wrap"><table>
+<thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Qualification</th><th>Orders</th><th>Lifetime Value</th><th>Since</th></tr></thead>
+<tbody id="customersBody"><tr><td colspan="7">Loading customers…</td></tr></tbody>
+</table></div>
+</section>
+<p style="margin-top:18px;color:#64748b;font-size:13px">Walk-in and unqualified customer details are not saved as customer profiles. Order records remain available for business and audit history.</p>
+</div></div>
 <script>
-const API="/api";
-const token=()=>sessionStorage.getItem("bizinsight_token");
-let customers=[];
-let editingId=null;
-function headers(json=false){
-    if(!token()) throw new Error("Your session has expired. Please sign in again.");
-    const h={Authorization:"Bearer "+token()};
-    if(json) h["Content-Type"]="application/json";
-    return h;
-}
-function showMessage(message,error=false){
-    const el=document.getElementById("message");el.textContent=message;
-    el.style.color=error?"#b42318":"#16794b";
-}
-async function api(path,options={}){
-    const response=await fetch(API+path,{...options,headers:{...headers(Boolean(options.body)),...(options.headers||{})}});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok) throw new Error(data.message||"Request failed");
-    return data;
-}
-function cell(row,value){const td=row.insertCell();td.textContent=value==null?"—":String(value);return td;}
+const API="/api", token=()=>sessionStorage.getItem("bizinsight_token");
+const me=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+function showMessage(m,error=false){const e=document.getElementById("message");e.textContent=m;e.style.color=error?"#b42318":"#16794b";}
 async function loadCustomers(){
-    const body=document.getElementById("customersBody");
-    try{
-        const data=await api("/customers");
-        customers=(Array.isArray(data)?data:data.customers||[]).filter(c=>c.is_active!==false);
-        body.replaceChildren();
-        if(!customers.length){body.innerHTML='<tr><td colspan="5">No active customers yet.</td></tr>';return;}
-        customers.forEach(customer=>{
-            const row=body.insertRow();
-            cell(row,customer.name);cell(row,customer.email);cell(row,customer.phone);cell(row,customer.address);
-            const actions=row.insertCell();
-            const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";
-            edit.addEventListener("click",()=>editCustomer(customer.id));
-            const archive=document.createElement("button");archive.type="button";archive.textContent="Archive";
-            archive.addEventListener("click",()=>archiveCustomer(customer.id));
-            actions.append(edit,document.createTextNode(" "),archive);
-        });
-    }catch(error){body.innerHTML='<tr><td colspan="5">Unable to load customers.</td></tr>';showMessage(error.message,true);}
+ try{
+  const response=await fetch(API+"/customers",{headers:{Authorization:"Bearer "+token()}});
+  const data=await response.json().catch(()=>[]);
+  if(!response.ok)throw new Error(data.message||"Unable to load customers");
+  const customers=Array.isArray(data)?data:[];
+  document.getElementById("customerCount").textContent=customers.length;
+  document.getElementById("frequentCount").textContent=customers.filter(c=>c.qualification_reason==="frequent").length;
+  document.getElementById("highValueCount").textContent=customers.filter(c=>c.qualification_reason==="high_value").length;
+  const body=document.getElementById("customersBody");body.replaceChildren();
+  if(!customers.length){body.innerHTML='<tr><td colspan="7">No customers have reached the configured thresholds yet.</td></tr>';return;}
+  customers.forEach(c=>{
+   const row=body.insertRow();
+   const add=value=>{const td=row.insertCell();td.textContent=value==null||value===""?"—":String(value);};
+   add(c.name);add(c.email);add(c.phone);
+   add(c.qualification_reason==="frequent"?"Frequent customer":c.qualification_reason==="high_value"?"High-value customer":"Qualified");
+   add(c.completed_order_count);
+   add(Number(c.lifetime_value||0).toLocaleString("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}));
+   add(c.created_at?new Date(c.created_at).toLocaleDateString("en-IN"):"—");
+  });
+ }catch(error){document.getElementById("customersBody").innerHTML='<tr><td colspan="7">Unable to load valuable customers.</td></tr>';showMessage(error.message,true);}
 }
-function editCustomer(id){
-    const customer=customers.find(item=>String(item.id)===String(id));
-    if(!customer)return showMessage("Customer not found.",true);
-    editingId=id;
-    document.getElementById("customerName").value=customer.name||"";
-    document.getElementById("customerEmail").value=customer.email||"";
-    document.getElementById("customerPhone").value=customer.phone||"";
-    document.getElementById("customerAddress").value=customer.address||"";
-    document.getElementById("formTitle").textContent="Edit Customer";
-    document.getElementById("saveButton").textContent="Save changes";
-    document.getElementById("cancelButton").hidden=false;
-    document.getElementById("customerForm").scrollIntoView({behavior:"smooth"});
-}
-function resetForm(){
-    editingId=null;document.getElementById("customerForm").reset();
-    document.getElementById("formTitle").textContent="Add Customer";
-    document.getElementById("saveButton").textContent="Add Customer";
-    document.getElementById("cancelButton").hidden=true;
-}
-async function archiveCustomer(id){
-    if(!confirm("Archive this customer? Existing order history will be preserved."))return;
-    try{
-        const result=await api("/customers/"+encodeURIComponent(id),{method:"DELETE"});
-        showMessage(result.message||"Customer archived.");
-        await loadCustomers();
-    }catch(error){showMessage(error.message,true);}
-}
-document.getElementById("customerForm").addEventListener("submit",async event=>{
-    event.preventDefault();
-    const payload={
-        name:document.getElementById("customerName").value.trim(),
-        email:document.getElementById("customerEmail").value.trim(),
-        phone:document.getElementById("customerPhone").value.trim(),
-        address:document.getElementById("customerAddress").value.trim()
-    };
-    if(!payload.name)return showMessage("Customer name is required.",true);
-    const button=document.getElementById("saveButton");button.disabled=true;
-    try{
-        const result=await api(editingId?"/customers/"+encodeURIComponent(editingId):"/customers",{
-            method:editingId?"PUT":"POST",body:JSON.stringify(payload)
-        });
-        showMessage(result.message||"Customer saved.");
-        resetForm();await loadCustomers();
-    }catch(error){showMessage(error.message,true);}
-    finally{button.disabled=false;}
-});
-document.getElementById("cancelButton").addEventListener("click",resetForm);
 document.getElementById("refreshButton").addEventListener("click",loadCustomers);
-document.getElementById("logoutLink").addEventListener("click",()=>{
-    sessionStorage.clear();localStorage.removeItem("bizinsight_token");localStorage.removeItem("bizinsight_user");
-});
+document.getElementById("logoutLink").addEventListener("click",()=>{sessionStorage.clear();localStorage.removeItem("bizinsight_token");localStorage.removeItem("bizinsight_user");});
 document.addEventListener("DOMContentLoaded",()=>{
-    if(!token()){window.location.href="index.html";return;}
-    loadCustomers();
+ if(!token()){location.href="index.html";return;}
+ if(!["admin","manager"].includes(me.role)){showMessage("Customer Management is restricted to Admin and Managers.",true);document.querySelector(".container").hidden=true;return;}
+ loadCustomers();
 });
-</script>
-<script>
-try {
-    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
-    if (navUser.role !== "admin") {
-        const adminLink = document.getElementById("adminUsersLink");
-        if (adminLink) adminLink.hidden = true;
-    }
-} catch (_) {
-    const adminLink = document.getElementById("adminUsersLink");
-    if (adminLink) adminLink.hidden = true;
-}
 </script>
 </body>
 </html>
