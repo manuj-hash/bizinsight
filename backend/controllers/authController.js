@@ -19,12 +19,23 @@ const login = async (req, res) => {
         }
 
         const userClient = createUserClient(data.session.access_token);
-        const { data: profile, error: profileError } = await userClient
+        let { data: profile, error: profileError } = await userClient
             .from("profiles")
             .select("id,full_name,phone,role,department_id,designation,manager_scope,reports_to")
             .eq("id", data.user.id)
             .maybeSingle();
 
+        // Backward compatibility while the review-only Phase 1.1 migration is pending.
+        if (profileError && ["42703", "PGRST204", "PGRST205"].includes(profileError.code)) {
+            const legacy = await userClient.from("profiles")
+                .select("id,full_name,phone,role")
+                .eq("id", data.user.id).maybeSingle();
+            profile = legacy.data ? {
+                ...legacy.data, department_id: null, designation: null,
+                manager_scope: null, reports_to: null
+            } : null;
+            profileError = legacy.error;
+        }
         if (profileError) throw profileError;
         if (!profile || !["admin", "manager", "staff"].includes(profile.role)) {
             await anonClient.auth.signOut();
