@@ -221,7 +221,7 @@ const listAnnouncementDepartments=async(req,res)=>{
         if(!has(req,"communication.general.publish")&&!has(req,"communication.responsibility.manage"))
             return res.status(403).json({message:"General announcement or responsibility access is not granted"});
         let query=getAdminClient().from("departments").select("id,name").eq("is_active",true).order("name");
-        if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("id",req.profile.department_id);
+        if(req.profile.role==="staff"||(req.profile.role==="manager"&&req.profile.manager_scope==="department"))query=query.eq("id",req.profile.department_id);
         const {data,error}=await query;
         if(error)throw error;
         return res.json(data||[]);
