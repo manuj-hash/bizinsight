@@ -148,9 +148,12 @@ const updateEmployee = async (req, res) => {
 
 const getDepartments = async (req, res) => {
     try {
-        const { data, error } = await adminClient().from("departments")
-            .select("id,name,description,is_active,created_at")
-            .order("name");
+        let query = adminClient().from("departments")
+            .select("id,name,description,is_active,created_at").order("name");
+        if (req.profile.role === "manager" && req.profile.manager_scope === "department") {
+            query = query.eq("id", req.profile.department_id);
+        }
+        const { data, error } = await query;
         if (error) throw error;
         return res.json((data || []).filter(dept => dept.is_active || req.profile.role === "admin"));
     } catch (error) {
@@ -160,6 +163,9 @@ const getDepartments = async (req, res) => {
 
 const createDepartment = async (req, res) => {
     try {
+        if (req.profile.role === "manager" && req.profile.manager_scope !== "company") {
+            return res.status(403).json({ message: "Only Admin or the Overall Manager can create departments" });
+        }
         const name = String(req.body.name || "").trim();
         if (name.length < 2 || name.length > 80) {
             return res.status(400).json({ message: "Department name must be 2–80 characters" });
