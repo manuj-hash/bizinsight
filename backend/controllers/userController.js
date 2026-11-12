@@ -1,13 +1,13 @@
-const { getAdminClient } = require("../config/supabase");
+const { createAnonClient, getAdminClient } = require("../config/supabase");
 
 const getUsers = async (req, res) => {
     try {
-        // This endpoint is admin-only at the route layer.
+        // Route is protected by protect + allowRoles("admin").
         const { data, error } = await getAdminClient().from("profiles")
             .select("id, full_name, phone, role, created_at, updated_at")
             .order("created_at", { ascending: false });
         if (error) throw error;
-        return res.json(data || []);
+        return res.status(200).json(data || []);
     } catch (error) {
         console.error("Get users error:", error.message);
         return res.status(500).json({ message: "Unable to fetch users" });
@@ -21,8 +21,9 @@ const getUser = async (req, res) => {
             .eq("id", req.user.id).maybeSingle();
         if (error) throw error;
         if (!data) return res.status(404).json({ message: "Profile not found" });
-        return res.json(data);
+        return res.status(200).json(data);
     } catch (error) {
+        console.error("Get profile error:", error.message);
         return res.status(500).json({ message: "Unable to fetch profile" });
     }
 };
@@ -45,7 +46,7 @@ const updateMyProfile = async (req, res) => {
             .eq("id", req.user.id)
             .select("id, full_name, phone, role, created_at, updated_at").single();
         if (error) throw error;
-        return res.json({ message: "Profile updated successfully", profile: data });
+        return res.status(200).json({ message: "Profile updated successfully", profile: data });
     } catch (error) {
         console.error("Update profile error:", error.message);
         return res.status(400).json({ message: "Unable to update profile" });
@@ -62,32 +63,64 @@ const updateUserRole = async (req, res) => {
             return res.status(400).json({ message: "You cannot change your own role" });
         }
 
-        const adminClient = getAdminClient();
-        const { data: target, error: targetError } = await adminClient.from("profiles")
-            .select("id, role").eq("id", req.params.id).maybeSingle();
-        if (targetError) throw targetError;
-        if (!target) return res.status(404).json({ message: "User profile not found" });
-
-        if (target.role === "admin" && role === "staff") {
-            const { count, error: countError } = await adminClient.from("profiles")
-                .select("id", { count: "exact", head: true }).eq("role", "admin");
-            if (countError) throw countError;
-            if ((count || 0) <= 1) {
-                return res.status(409).json({ message: "The last administrator cannot be demoted" });
+        // The database function serializes concurrent changes and protects the last admin.
+        const { data, error } = await getAdminClient().rpc(
+            "admin_update_bizinsight_user_role",
+            { p_user_id: req.params.id, p_role: role }
+        );
+        if (error) {
+            if (error.code === "PGRST202") {
+                return res.status(409).json({
+                    message: "Role management requires the approved database migration. Apply it after review and backup."
+                });
             }
+            throw error;
         }
-
-        const { data, error } = await adminClient.from("profiles").update({ role })
-            .eq("id", req.params.id)
-            .select("id, full_name, phone, role").maybeSingle();
-        if (error) throw error;
-        if (!data) return res.status(404).json({ message: "User profile not found" });
-        return res.json({ message: "User role updated successfully", user: data });
+        return res.status(200).json({ message: "User role updated successfully", user: data });
     } catch (error) {
         console.error("Update user role error:", error.message);
-        return res.status(400).json({ message: "Unable to update user role" });
+        return res.status(400).json({ message: error.message || "Unable to update user role" });
+    }
+};
+
+const updateMyPassword = async (req, res) => {
+    try {
+        const currentPassword = req.body.current_password;
+        const newPassword = req.body.new_password;
+
+        if (typeof currentPassword !== "string" || !currentPassword ||
+            typeof newPassword !== "string" || newPassword.length < 8) {
+            return res.status(400).json({
+                message: "Current password and a new password of at least 8 characters are required"
+            });
+        }
+
+        // Re-authenticate with the current password before changing credentials.
+        const authClient = createAnonClient();
+        const { data: verified, error: verifyError } = await authClient.auth.signInWithPassword({
+            email: req.user.email,
+            password: currentPassword
+        });
+        if (verifyError || !verified.user || verified.user.id !== req.user.id) {
+            return res.status(400).json({ message: "Current password is incorrect" });
+        }
+
+        const { error: updateError } = await getAdminClient().auth.admin.updateUserById(
+            req.user.id,
+            { password: newPassword }
+        );
+        if (updateError) throw updateError;
+
+        return res.status(200).json({
+            message: "Password updated successfully. Please sign in again."
+        });
+    } catch (error) {
+        console.error("Update password error:", error.message);
+        return res.status(400).json({ message: error.message || "Unable to update password" });
     }
 };
 
 const inviteStaff = require("./authController").inviteStaff;
-module.exports = { getUsers, getUser, updateMyProfile, updateUserRole, inviteStaff };
+module.exports = {
+    getUsers, getUser, updateMyProfile, updateMyPassword, updateUserRole, inviteStaff
+};
