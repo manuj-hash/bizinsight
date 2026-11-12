@@ -256,26 +256,10 @@ document.getElementById("customerSelect").addEventListener("change",()=>{
 });
 document.addEventListener("DOMContentLoaded",async()=>{
     if(!token()){window.location.href="index.html";return;}
-    if(!["admin","manager"].includes(currentUser.role)){
-        const link=document.getElementById("customersNavLink");if(link)link.hidden=true;
-        const staffLink=document.getElementById("staffNavLink");if(staffLink)staffLink.hidden=true;
-    }
     try{await loadReferenceData();await loadOrders();}
     catch(error){showMessage(error.message,true);}
 });
 </script>
-<script>
-try {
-    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
-    if (navUser.role !== "admin") {
-        const adminLink = document.getElementById("adminUsersLink");
-        if (adminLink) adminLink.hidden = true;
-    }
-} catch (_) {
-    const adminLink = document.getElementById("adminUsersLink");
-    if (adminLink) adminLink.hidden = true;
-}
-</script>
-    <script src="permissions.js" defer></script>
+<script src="permissions.js" defer></script>
 </body>
 </html>
