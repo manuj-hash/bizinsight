@@ -27,7 +27,7 @@ This migration is designed for the live baseline audited on 2026-11-12, where th
 4. Apply `005_access_notifications.sql` only after 004, because it references `permission_catalog`.
 5. Do not apply `003_staff_departments_customer_preferences.sql` from the older branch unchanged. It also modifies customer/order behavior and assumes schema that is not present in the audited live database. Customer/order qualification must be split into a separate, independently reviewed migration.
 
-The numbered filenames reflect the repository's staged work, not the remote Supabase migration history. Confirm the actual remote migration ledger and use the project's established migration deployment process; do not blindly replay old migrations.
+Manager RPC runtime tests must run after 004 is applied, because the database RPCs now verify `user_permissions` directly; until then, manager RPC calls intentionally fail closed. The RPCs derive the actor from `auth.uid()` and no longer accept a caller-supplied actor ID. Manager RPCs also enforce `staff.manage`, `staff.departments.manage`, or `staff.compensation.manage` as applicable. The numbered filenames reflect the repository's staged work, not the remote Supabase migration history. Confirm the actual remote migration ledger and use the project's established migration deployment process; do not blindly replay old migrations.
 
 ## Manager model
 
@@ -54,7 +54,7 @@ Run these checks in a non-production environment first:
 8. Company-wide Manager can manage Staff in all departments but cannot appoint Managers.
 9. Staff cannot access employee-management endpoints.
 10. Users cannot change their own role, department, manager scope, or reporting relationship through the Data API.
-11. Compensation changes close the prior effective record and create one current record.
+11. Compensation changes close/split the applicable effective-date interval, preserve later scheduled records, and support same-day corrections without duplicate effective dates. Future salary rows must not be returned as current before their effective date.
 12. Switching back to single-manager mode is rejected until department Managers are removed.
 13. Existing Admin and Staff accounts still authenticate. Existing Staff with no department must be assigned by Admin before they can use department-scoped features.
 
