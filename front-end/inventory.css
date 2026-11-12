@@ -157,3 +157,59 @@ td{
 tr:hover{
     background: #f5f5f5;
 }
+
+/* Shared controls and responsive layout for inventory, sales and customers. */
+.form-container select,
+.form-container textarea,
+.order-item-row select,
+.order-item-row input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+    background: #fff;
+}
+
+.form-container textarea {
+    resize: vertical;
+}
+
+.table-container {
+    overflow: hidden;
+    margin-bottom: 28px;
+}
+
+.table-container table {
+    min-width: 680px;
+}
+
+.table-container button,
+.form-container button {
+    margin: 6px 6px 6px 0;
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+    body { padding: 16px; }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 14px;
+    }
+    .sidebar h2 { margin-bottom: 10px; }
+    .sidebar a { display: inline-block; padding: 9px 10px; margin: 3px; font-size: 14px; }
+    .sidebar a.lout { margin-top: 0; }
+    .main-content { margin-left: 0; width: 100%; padding: 14px 0; }
+    .container { width: 100%; }
+    .order-item-row { grid-template-columns: 1fr !important; }
+}

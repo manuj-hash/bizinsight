@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizInsight | Valuable Customers</title>
+<link rel="stylesheet" href="inventory.css">
+<style>
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:20px 0}
+.metric{background:#fff;padding:18px;border-radius:12px;box-shadow:0 3px 14px rgba(20,35,60,.06)}
+.metric strong{display:block;font-size:24px;margin-top:8px}
+.table-wrap{overflow-x:auto}.table-wrap table{min-width:760px;width:100%;border-collapse:collapse}
+.table-wrap th,.table-wrap td{padding:11px;border-bottom:1px solid #e7ebf0;text-align:left}
+.message{min-height:22px}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<h2>BizInsight</h2>
+<a href="dashboard.html">Dashboard</a>
+<a href="inventory.html">Inventory</a>
+<a href="orders.html">Sales & Orders</a>
+<a href="customers.html" class="active" id="customersNavLink">Customers</a>
+<a href="analytics.html">Analytics</a>
+<a href="reports.html">Reports</a>
+<a href="staff.html" id="staffNavLink">Staff Management</a>
+<a href="profile.html">Profile</a>
+<a href="index.html" class="lout" id="logoutLink">Logout</a>
+</div>
+<div class="main-content"><div class="container">
+<h1>Valuable Customer Registry</h1>
+<p>Only frequent customers and high-value order customers receive a permanent customer profile.</p>
+<p class="message" id="message" role="status" aria-live="polite"></p>
+<div class="metric-row">
+<div class="metric"><span>Registered valuable customers</span><strong id="customerCount">—</strong></div>
+<div class="metric"><span>Frequent customers</span><strong id="frequentCount">—</strong></div>
+<div class="metric"><span>High-value customers</span><strong id="highValueCount">—</strong></div>
+</div>
+<section class="table-container">
+<h2>Qualified customers</h2>
+<button type="button" id="refreshButton">Refresh</button>
+<div class="table-wrap"><table>
+<thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Qualification</th><th>Orders</th><th>Lifetime Value</th><th>Since</th></tr></thead>
+<tbody id="customersBody"><tr><td colspan="7">Loading customers…</td></tr></tbody>
+</table></div>
+</section>
+<p style="margin-top:18px;color:#64748b;font-size:13px">Walk-in and unqualified customer details are not saved as customer profiles. Order records remain available for business and audit history.</p>
+</div></div>
+<script>
+const API="/api", token=()=>sessionStorage.getItem("bizinsight_token");
+const me=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+function showMessage(m,error=false){const e=document.getElementById("message");e.textContent=m;e.style.color=error?"#b42318":"#16794b";}
+async function loadCustomers(){
+ try{
+  const response=await fetch(API+"/customers",{headers:{Authorization:"Bearer "+token()}});
+  const data=await response.json().catch(()=>[]);
+  if(!response.ok)throw new Error(data.message||"Unable to load customers");
+  const customers=Array.isArray(data)?data:[];
+  document.getElementById("customerCount").textContent=customers.length;
+  document.getElementById("frequentCount").textContent=customers.filter(c=>c.qualification_reason==="frequent").length;
+  document.getElementById("highValueCount").textContent=customers.filter(c=>c.qualification_reason==="high_value").length;
+  const body=document.getElementById("customersBody");body.replaceChildren();
+  if(!customers.length){body.innerHTML='<tr><td colspan="7">No customers have reached the configured thresholds yet.</td></tr>';return;}
+  customers.forEach(c=>{
+   const row=body.insertRow();
+   const add=value=>{const td=row.insertCell();td.textContent=value==null||value===""?"—":String(value);};
+   add(c.name);add(c.email);add(c.phone);
+   add(c.qualification_reason==="frequent"?"Frequent customer":c.qualification_reason==="high_value"?"High-value customer":"Qualified");
+   add(c.order_count);
+   add(Number(c.lifetime_value||0).toLocaleString("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}));
+   add(c.created_at?new Date(c.created_at).toLocaleDateString("en-IN"):"—");
+  });
+ }catch(error){document.getElementById("customersBody").innerHTML='<tr><td colspan="7">Unable to load valuable customers.</td></tr>';showMessage(error.message,true);}
+}
+document.getElementById("refreshButton").addEventListener("click",loadCustomers);
+document.getElementById("logoutLink").addEventListener("click",()=>{sessionStorage.clear();localStorage.removeItem("bizinsight_token");localStorage.removeItem("bizinsight_user");});
+document.addEventListener("DOMContentLoaded",()=>{
+ if(!token()){location.href="index.html";return;}
+ if(!["admin","manager"].includes(me.role)){showMessage("Customer Management is restricted to Admin and Managers.",true);document.querySelector(".container").hidden=true;return;}
+ loadCustomers();
+});
+</script>
+</body>
+</html>

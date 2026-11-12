@@ -13,8 +13,11 @@
     <h2>BizInsight</h2>
     <a href="dashboard.html">🏠 Dashboard</a>
     <a href="inventory.html">📦 Inventory</a>
+    <a href="orders.html">Sales & Orders</a>
+    <a href="customers.html" id="customersNavLink">Customers</a>
     <a href="analytics.html">📊 Analytics</a>
     <a href="reports.html" class="active">📄 Reports</a>
+    <a href="staff.html" id="staffNavLink">Staff Management</a>
     <a href="profile.html">👤 Profile</a>
     <a href="index.html" class="lout" onclick="logout()">🚪 Logout</a>
 </div>
@@ -77,7 +80,7 @@
 </div>
 
 <script>
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "/api";
 
 const PRODUCTS_API = `${API_BASE}/products`;
 const ORDERS_API = `${API_BASE}/orders`;
@@ -88,12 +91,14 @@ let orders = [];
 let analytics = {};
 
 function getToken() {
-    return localStorage.getItem("bizinsight_token");
+    return sessionStorage.getItem("bizinsight_token");
 }
 
 function logout() {
     localStorage.removeItem("bizinsight_token");
+    sessionStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
+    sessionStorage.removeItem("bizinsight_user");
 }
 
 function showMessage(message, isError = false) {
@@ -393,5 +398,31 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+<script>
+try {
+    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
+    if (navUser.role !== "admin") {
+        const adminLink = document.getElementById("adminUsersLink");
+        if (adminLink) adminLink.hidden = true;
+    }
+} catch (_) {
+    const adminLink = document.getElementById("adminUsersLink");
+    if (adminLink) adminLink.hidden = true;
+}
+</script>
+<script>
+(function(){
+ try {
+  const navUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+  if(!["admin","manager"].includes(navUser.role)){
+   const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+   const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+  }
+ } catch (_) {
+  const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+  const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+ }
+})();
+</script>
 </body>
 </html>

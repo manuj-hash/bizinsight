@@ -7,10 +7,25 @@ const cors = require("cors");
 const fs = require("fs");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+    throw new Error("PORT must be an integer between 1 and 65535");
+}
 
 // Middleware
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin(origin, callback) {
+        // Same-origin requests do not need CORS headers. Cross-origin access
+        // is allowed only for explicitly configured frontend origins.
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(null, false);
+    }
+}));
 app.use(express.json({ limit: "1mb" }));
 
 // Exact frontend location
@@ -48,10 +63,12 @@ app.get("/api/status", (req, res) => {
 // API routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
+app.use("/api/inventory/movements", require("./routes/inventoryMovementRoutes"));
 app.use("/api/customers", require("./routes/customerRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/staff", require("./routes/staffRoutes"));
 
 // Unknown API
 app.use("/api", (req, res) => {

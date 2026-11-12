@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizInsight | Staff Management</title>
+<link rel="stylesheet" href="inventory.css">
+<style>
+.section-card{background:#fff;border-radius:14px;padding:22px;margin:22px 0;box-shadow:0 4px 18px rgba(20,35,60,.07)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.form-grid label{display:block;font-weight:600;margin:7px 0}
+.form-grid input,.form-grid select{width:100%;padding:10px;border:1px solid #d6dce5;border-radius:8px}
+.table-wrap{overflow-x:auto}.table-wrap table{min-width:850px;width:100%;border-collapse:collapse}
+.table-wrap th,.table-wrap td{padding:10px;border-bottom:1px solid #e7ebf0;text-align:left}
+.muted{color:#64748b;font-size:13px}.hidden{display:none!important}
+.message{min-height:22px;margin:12px 0}
+.inline-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.inline-controls select,.inline-controls input{max-width:180px;padding:7px;border:1px solid #d6dce5;border-radius:7px}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<h2>BizInsight</h2>
+<a href="dashboard.html">Dashboard</a>
+<a href="inventory.html">Inventory</a>
+<a href="orders.html">Sales & Orders</a>
+<a href="customers.html" id="customersNavLink">Customers</a>
+<a href="analytics.html">Analytics</a>
+<a href="reports.html">Reports</a>
+<a href="staff.html" id="staffNavLink" class="active">Staff Management</a>
+<a href="profile.html">Profile</a>
+<a href="index.html" class="lout" id="logoutLink">Logout</a>
+</div>
+<div class="main-content"><div class="container">
+<h1>Staff Management</h1>
+<p>Manage employees, departments, management scope and salary access.</p>
+<p class="muted">Admin controls Manager appointments. Managers can manage General Staff within their permitted scope. Admin contact details are never included in Manager responses.</p>
+<p id="message" class="message" role="status" aria-live="polite"></p>
+
+<section class="section-card">
+<h2>Invite employee</h2>
+<form id="inviteForm">
+<div class="form-grid">
+<div><label for="fullName">Full name</label><input id="fullName" maxlength="150" required></div>
+<div><label for="email">Work email</label><input id="email" type="email" maxlength="254" required></div>
+<div><label for="phone">Phone</label><input id="phone" type="tel" maxlength="30"></div>
+<div><label for="role">Role</label><select id="role"><option value="staff">General Staff</option><option value="manager" id="managerOption">Manager</option></select></div>
+<div id="departmentWrap"><label for="department">Department</label><select id="department" required><option value="">Select department</option></select></div>
+<div><label for="designation">Designation</label><input id="designation" maxlength="100" placeholder="e.g. Sales Executive"></div>
+<div id="managerScopeWrap"><label for="managerScope">Manager scope</label><select id="managerScope"><option value="company">Overall Manager — all departments</option><option value="department">Department Manager</option></select></div>
+<div id="reportsToWrap" class="hidden"><label for="reportsTo">Reports to</label><select id="reportsTo"><option value="">Overall Manager</option></select></div>
+</div>
+<p class="muted">Only Admin can appoint Managers. A company can have one Overall Manager. Additional Department Managers require Manager Hierarchy mode and report to the Overall Manager.</p>
+<button type="submit" id="inviteButton">Send invitation</button>
+</form>
+</section>
+
+<section class="section-card">
+<h2>Departments</h2>
+<form id="departmentForm">
+<div class="form-grid">
+<div><label for="departmentName">Department name</label><input id="departmentName" maxlength="80" required placeholder="e.g. Cleaning"></div>
+<div><label for="departmentDescription">Description</label><input id="departmentDescription" maxlength="300" placeholder="Department responsibilities"></div>
+</div>
+<button type="submit" id="createDepartmentButton">Create department</button>
+</form>
+<div class="table-wrap"><table><thead><tr><th>Department</th><th>Description</th><th>Status</th></tr></thead><tbody id="departmentsBody"><tr><td colspan="3">Loading departments…</td></tr></tbody></table></div>
+</section>
+
+<section class="section-card">
+<h2>Company preferences</h2>
+<form id="preferencesForm">
+<div class="form-grid">
+<div id="managementModeWrap"><label for="managementMode">Management structure</label><select id="managementMode"><option value="single_manager">One Overall Manager controls all departments</option><option value="manager_hierarchy">Overall Manager + Department Managers</option></select></div>
+<div><label for="frequentOrders">Frequent customer order threshold</label><input id="frequentOrders" type="number" min="2" step="1" required></div>
+<div><label for="highValueAmount">High-value customer threshold (₹)</label><input id="highValueAmount" type="number" min="1" step="0.01" required></div>
+</div>
+<p class="muted">Customer profiles are created only after configured thresholds are reached. Non-qualified buyers are not stored as customer profiles.</p>
+<button type="submit">Save preferences</button>
+</form>
+</section>
+
+<section class="section-card">
+<h2>Employees</h2>
+<button type="button" id="refreshStaff">Refresh staff</button>
+<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Email</th><th>Phone</th><th>Role</th><th>Department</th><th>Designation</th><th>Salary</th><th>Actions</th></tr></thead><tbody id="staffBody"><tr><td colspan="8">Loading staff…</td></tr></tbody></table></div>
+</section>
+</div></div>
+<script>
+const API="/api";
+const token=()=>sessionStorage.getItem("bizinsight_token");
+const me=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+let departments=[], staff=[];
+const $=id=>document.getElementById(id);
+function showMessage(text,error=false){$("message").textContent=text;$("message").style.color=error?"#b42318":"#16794b";}
+function headers(json=false){if(!token())throw new Error("Session expired. Sign in again.");const h={Authorization:"Bearer "+token()};if(json)h["Content-Type"]="application/json";return h;}
+async function api(path,options={}){const response=await fetch(API+path,{...options,headers:{...headers(Boolean(options.body)),...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||"Request failed");return data;}
+function cell(row,value){const td=row.insertCell();td.textContent=value==null||value===""?"—":String(value);return td;}
+function fillDepartmentSelect(select,selected=""){
+ select.replaceChildren(new Option("Select department",""));
+ departments.filter(d=>d.is_active).forEach(d=>select.add(new Option(d.name,d.id)));
+ if(selected)select.value=selected;
+ if(me.role==="manager"&&me.manager_scope==="department"){select.value=me.department_id||"";select.disabled=true;}
+}
+async function loadDepartments(){
+ departments=await api("/staff/departments");
+ fillDepartmentSelect($("department"));
+ const body=$("departmentsBody");body.replaceChildren();
+ if(!departments.length){body.innerHTML='<tr><td colspan="3">No departments yet. Create the first department.</td></tr>';return;}
+ departments.forEach(d=>{const row=body.insertRow();cell(row,d.name);cell(row,d.description);cell(row,d.is_active?"Active":"Inactive");});
+}
+async function loadPreferences(){
+ const p=await api("/staff/preferences");
+ $("managementMode").value=p.management_mode;
+ $("frequentOrders").value=p.frequent_customer_min_orders;
+ $("highValueAmount").value=p.high_value_customer_amount;
+ if(me.role!=="admin"){$("managementModeWrap").classList.add("hidden");}
+}
+async function loadStaff(){
+ const body=$("staffBody");body.replaceChildren();
+ try{
+  staff=await api("/staff");
+  if(!staff.length){body.innerHTML='<tr><td colspan="8">No employee profiles found.</td></tr>';return;}
+  staff.forEach(person=>{
+   const row=body.insertRow();
+   cell(row,person.full_name);
+   cell(row,person.role==="admin"?"Admin":person.role==="manager"?(person.manager_scope==="company"?"Overall Manager":"Department Manager"):"General Staff");
+   cell(row,person.department_name);
+   cell(row,person.designation);
+   const salary=person.compensation;
+   cell(row,salary?Number(salary.base_salary).toLocaleString("en-IN",{style:"currency",currency:salary.currency_code||"INR",maximumFractionDigits:2})+" / "+salary.pay_frequency:"Not set");
+   const actions=row.insertCell();
+   if(person.role==="admin"){actions.textContent="Protected administrator account";return;}
+   const canEdit=me.role==="admin"||(me.role==="manager"&&person.role==="staff"&&(me.manager_scope==="company"||person.department_id===me.department_id));
+   if(!canEdit){actions.textContent="—";return;}
+   const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";
+   edit.addEventListener("click",()=>editEmployee(person));
+   actions.append(edit,document.createTextNode(" "));
+   const salaryBtn=document.createElement("button");salaryBtn.type="button";salaryBtn.textContent="Set salary";
+   salaryBtn.addEventListener("click",()=>setSalary(person));
+   actions.append(salaryBtn);
+  });
+ }catch(error){body.innerHTML='<tr><td colspan="8">Unable to load employees.</td></tr>';showMessage(error.message,true);}
+}
+function editEmployee(person){
+ const role=prompt("Role: staff or manager",person.role);
+ if(role===null)return;
+ let managerScope=null,reportsTo=null;
+ if(role.trim()==="manager"&&me.role==="admin"){
+   managerScope=prompt("Manager scope: company or department",person.manager_scope||"department");
+   if(managerScope===null)return;
+ }
+ let departmentId=null;
+ if(!(role.trim()==="manager"&&managerScope==="company")){
+   const departmentName=prompt("Enter exact department name",person.department_name||"");
+   if(departmentName===null)return;
+   const dept=departments.find(d=>d.name.toLowerCase()===departmentName.trim().toLowerCase());
+   if(!dept)return showMessage("Department not found. Create it first.",true);
+   departmentId=dept.id;
+ }
+ if(role.trim()==="manager"&&managerScope==="department"){
+   const overall=staff.find(x=>x.role==="manager"&&x.manager_scope==="company");
+   reportsTo=overall?.id||null;
+   if(!reportsTo)return showMessage("Appoint an Overall Manager first.",true);
+ }
+ const designation=prompt("Designation",person.designation||"");
+ if(designation===null)return;
+ api("/staff/"+encodeURIComponent(person.id),{method:"PATCH",body:JSON.stringify({
+   role:role.trim(),department_id:departmentId,designation,
+   manager_scope:managerScope,reports_to:reportsTo
+ })}).then(async r=>{showMessage(r.message);await loadStaff();}).catch(e=>showMessage(e.message,true));
+}
+async function setSalary(person){
+ const current=person.compensation?.base_salary||"";
+ const value=prompt("Enter base salary (INR)",current);
+ if(value===null)return;
+ const amount=Number(value);
+ if(!Number.isFinite(amount)||amount<0)return showMessage("Enter a valid non-negative salary.",true);
+ try{
+  const result=await api("/staff/"+encodeURIComponent(person.id)+"/compensation",{method:"PUT",body:JSON.stringify({
+   base_salary:amount,currency_code:"INR",pay_frequency:"monthly",effective_from:new Date().toISOString().slice(0,10)
+  })});
+  showMessage(result.message);await loadStaff();
+ }catch(error){showMessage(error.message,true);}
+}
+function updateRoleControls(){
+ const isAdmin=me.role==="admin";
+ const isCompanyManager=$("role").value==="manager"&&$("managerScope").value==="company";
+ $("managerOption").hidden=!isAdmin;
+ $("managerScopeWrap").classList.toggle("hidden",!isAdmin||$("role").value!=="manager");
+ $("reportsToWrap").classList.toggle("hidden",!isAdmin||$("role").value!=="manager"||$("managerScope").value!=="department");
+ $("departmentWrap").classList.toggle("hidden",isCompanyManager);
+ $("department").required=!isCompanyManager;
+}
+$("role").addEventListener("change",updateRoleControls);
+$("managerScope").addEventListener("change",updateRoleControls);
+$("inviteForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const role=$("role").value,scope=role==="manager"?$("managerScope").value:null;
+ const overall=staff.find(x=>x.role==="manager"&&x.manager_scope==="company");
+ const departmentId=scope==="company"?null:$("department").value;
+ try{
+  const result=await api("/staff/invite",{method:"POST",body:JSON.stringify({
+   full_name:$("fullName").value.trim(),email:$("email").value.trim(),phone:$("phone").value.trim(),
+   role,department_id:departmentId,designation:$("designation").value.trim(),
+   manager_scope:scope,reports_to:scope==="department"?(overall?.id||null):null
+  })});
+  showMessage(result.message);$("inviteForm").reset();updateRoleControls();
+  await loadStaff();await loadDepartments();
+ }catch(error){showMessage(error.message,true);}
+});
+$("departmentForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ try{const result=await api("/staff/departments",{method:"POST",body:JSON.stringify({name:$("departmentName").value.trim(),description:$("departmentDescription").value.trim()})});showMessage(result.message);$("departmentForm").reset();await loadDepartments();}
+ catch(error){showMessage(error.message,true);}
+});
+$("preferencesForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ try{
+  const payload={frequent_customer_min_orders:Number($("frequentOrders").value),high_value_customer_amount:Number($("highValueAmount").value)};
+  if(me.role==="admin")payload.management_mode=$("managementMode").value;
+  const result=await api("/staff/preferences",{method:"PATCH",body:JSON.stringify(payload)});
+  showMessage(result.message);await loadPreferences();
+ }catch(error){showMessage(error.message,true);}
+});
+$("refreshStaff").addEventListener("click",loadStaff);
+$("logoutLink").addEventListener("click",()=>{sessionStorage.clear();localStorage.removeItem("bizinsight_token");localStorage.removeItem("bizinsight_user");});
+$("role").value="staff";updateRoleControls();
+document.addEventListener("DOMContentLoaded",async()=>{
+ if(!token()){location.href="index.html";return;}
+ if(!["admin","manager"].includes(me.role)){showMessage("Staff Management is restricted to Admin and Managers.",true);document.querySelector(".container").hidden=true;return;}
+ try{await loadDepartments();await loadPreferences();await loadStaff();}
+ catch(error){showMessage(error.message,true);}
+});
+</script>
+</body>
+</html>

@@ -1,443 +1,370 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Management</title>
+    <title>BizInsight | Inventory</title>
     <link rel="stylesheet" href="inventory.css">
 </head>
 <body>
-
 <div class="sidebar">
     <h2>BizInsight</h2>
-    <a href="dashboard.html">🏠 Dashboard</a>
-    <a href="inventory.html" class="active">📦 Inventory</a>
-    <a href="analytics.html">📊 Analytics</a>
-    <a href="reports.html">📄 Reports</a>
-    <a href="profile.html">👤 Profile</a>
-    <a href="index.html" class="lout" onclick="logout()">🚪 Logout</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html" class="active">Inventory</a>
+    <a href="orders.html">Sales & Orders</a>
+    <a href="customers.html" id="customersNavLink">Customers</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="reports.html">Reports</a>
+    <a href="staff.html" id="staffNavLink">Staff Management</a>
+    <a href="profile.html">Profile</a>
+    <a href="index.html" class="lout" id="logoutLink">Logout</a>
 </div>
 
 <div class="main-content">
     <div class="container">
-
         <h1>Inventory Management</h1>
-        <p>Manage your business products efficiently</p>
+        <p>Manage products, stock levels and stock movement history.</p>
+        <p id="message" role="status" aria-live="polite"></p>
 
-        <div id="message" role="status"></div>
-
-        <div class="form-container">
-            <h3 id="formTitle">Add New Product</h3>
-
+        <section class="form-container">
+            <h3 id="formTitle">Add Product</h3>
             <form id="productForm">
+                <label for="productName">Product name</label>
+                <input id="productName" maxlength="150" required>
 
-                <label>Product Name</label>
-                <input type="text" id="productName"
-                       placeholder="Enter Product Name" required>
+                <label for="productSku">SKU</label>
+                <input id="productSku" maxlength="80" required>
 
-                <label>SKU</label>
-                <input type="text" id="productSku"
-                       placeholder="Enter Unique SKU" required>
+                <label for="productCategory">Category</label>
+                <input id="productCategory" maxlength="100">
 
-                <label>Category</label>
-                <input type="text" id="productCategory"
-                       placeholder="Enter Category" required>
+                <label for="productStock">Opening / current stock</label>
+                <input id="productStock" type="number" min="0" step="1" value="0" required>
 
-                <label>Quantity</label>
-                <input type="number" id="productStock"
-                       placeholder="Enter Quantity" min="0" required>
+                <label for="productPrice">Selling price (₹)</label>
+                <input id="productPrice" type="number" min="0" step="0.01" required>
 
-                <label>Price</label>
-                <input type="number" id="productPrice"
-                       placeholder="Enter Price" min="0" step="0.01" required>
+                <label for="productCost">Cost price (₹)</label>
+                <input id="productCost" type="number" min="0" step="0.01" value="0">
 
-                <label>Description</label>
-                <input type="text" id="productDescription"
-                       placeholder="Enter Description">
+                <label for="reorderLevel">Reorder level</label>
+                <input id="reorderLevel" type="number" min="0" step="1" value="5">
+
+                <label for="productDescription">Description</label>
+                <textarea id="productDescription" rows="2" maxlength="1000"></textarea>
 
                 <button type="submit" id="submitBtn">Add Product</button>
-
-                <button type="button" id="cancelBtn"
-                        onclick="cancelEdit()" hidden>
-                    Cancel Edit
-                </button>
-
+                <button type="button" id="cancelBtn" hidden>Cancel edit</button>
             </form>
-        </div>
+        </section>
 
-        <div class="table-container">
+        <section class="table-container">
+            <h3>Active Products</h3>
+            <button type="button" id="refreshProducts">Refresh</button>
+            <div style="overflow-x:auto">
+                <table>
+                    <thead><tr>
+                        <th>Product</th><th>SKU</th><th>Category</th>
+                        <th>Stock</th><th>Reorder at</th><th>Price</th>
+                        <th>Status</th><th>Actions</th>
+                    </tr></thead>
+                    <tbody id="productTableBody">
+                        <tr><td colspan="8">Loading products...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-            <h3>Product Inventory</h3>
-
-            <button type="button" onclick="loadProducts()">
-                Refresh Inventory
-            </button>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>SKU</th>
-                        <th>Category</th>
-                        <th>Quantity</th>
-                        <th>Price</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-
-                <tbody id="productTableBody">
-                    <tr>
-                        <td colspan="7">Loading products...</td>
-                    </tr>
-                </tbody>
-            </table>
-
-        </div>
-
+        <section class="table-container">
+            <h3>Recent Stock Movements</h3>
+            <p>Every stock increase or decrease should have a recorded reason.</p>
+            <div style="overflow-x:auto">
+                <table>
+                    <thead><tr>
+                        <th>Date</th><th>Product</th><th>Movement</th>
+                        <th>Change</th><th>Balance</th><th>Reason</th>
+                    </tr></thead>
+                    <tbody id="movementTableBody">
+                        <tr><td colspan="6">Loading stock history...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 </div>
 
 <script>
-    // --------------------------------
-    // API CONFIGURATION
-    // --------------------------------
+const API = "/api";
+const token = () => sessionStorage.getItem("bizinsight_token");
+let products = [];
+let editingId = null;
 
-    const API_BASE_URL = "http://localhost:3000/api";
-    const PRODUCTS_API = `${API_BASE_URL}/products`;
+function headers(json = false) {
+    const value = token();
+    if (!value) throw new Error("Your session has expired. Please sign in again.");
+    const result = { Authorization: "Bearer " + value };
+    if (json) result["Content-Type"] = "application/json";
+    return result;
+}
 
-    // Products with stock at or below this value
-    // are displayed as Low Stock.
-    const LOW_STOCK_THRESHOLD = 20;
+function showMessage(message, error = false) {
+    const node = document.getElementById("message");
+    node.textContent = message;
+    node.style.color = error ? "#b42318" : "#16794b";
+}
 
-    let editingProductId = null;
-    let products = [];
-
-    // --------------------------------
-    // AUTHENTICATION
-    // --------------------------------
-
-    function getToken() {
-        return localStorage.getItem("bizinsight_token");
-    }
-
-    function logout() {
-        localStorage.removeItem("bizinsight_token");
-        localStorage.removeItem("bizinsight_user");
-    }
-
-    function getHeaders(includeContentType = false) {
-        const token = getToken();
-
-        if (!token) {
-            throw new Error("Please login first.");
-        }
-
-        const headers = {
-            "Authorization": `Bearer ${token}`
-        };
-
-        if (includeContentType) {
-            headers["Content-Type"] = "application/json";
-        }
-
-        return headers;
-    }
-
-    // --------------------------------
-    // MESSAGE DISPLAY
-    // --------------------------------
-
-    function showMessage(message, isError = false) {
-        const messageBox = document.getElementById("message");
-
-        messageBox.textContent = message;
-        messageBox.style.color = isError ? "red" : "green";
-        messageBox.style.margin = "10px 0";
-    }
-
-    // --------------------------------
-    // SAFE HTML DISPLAY
-    // --------------------------------
-
-    function escapeHTML(value) {
-        return String(value ?? "").replace(/[&<>"']/g, char => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        })[char]);
-    }
-
-    // --------------------------------
-    // LOAD PRODUCTS
-    // --------------------------------
-
-    async function loadProducts() {
-
-        const tableBody = document.getElementById("productTableBody");
-
-        tableBody.innerHTML =
-            `<tr><td colspan="7">Loading products...</td></tr>`;
-
-        try {
-
-            const response = await fetch(PRODUCTS_API, {
-                method: "GET",
-                headers: getHeaders()
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Unable to load products.");
-            }
-
-            // Support either an array or { products: [...] }
-            products = Array.isArray(data)
-                ? data
-                : (data.products || []);
-
-            displayProducts();
-
-        } catch (error) {
-
-            tableBody.innerHTML =
-                `<tr><td colspan="7">Unable to load products.</td></tr>`;
-
-            showMessage(error.message, true);
-        }
-    }
-
-    // --------------------------------
-    // DISPLAY PRODUCTS
-    // --------------------------------
-
-    function displayProducts() {
-
-        const tableBody = document.getElementById("productTableBody");
-
-        if (products.length === 0) {
-            tableBody.innerHTML =
-                `<tr><td colspan="7">No products found.</td></tr>`;
-            return;
-        }
-
-        tableBody.innerHTML = products.map(product => {
-
-            const id = product._id || product.id;
-            const stock = Number(product.stock) || 0;
-
-            let status;
-
-            if (stock === 0) {
-                status = "Out of Stock";
-            } else if (stock <= LOW_STOCK_THRESHOLD) {
-                status = "Low Stock";
-            } else {
-                status = "In Stock";
-            }
-
-            return `
-                <tr>
-                    <td>${escapeHTML(product.name)}</td>
-                    <td>${escapeHTML(product.sku)}</td>
-                    <td>${escapeHTML(product.category)}</td>
-                    <td>${stock}</td>
-                    <td>₹${Number(product.price).toLocaleString("en-IN")}</td>
-                    <td>${status}</td>
-                    <td>
-                        <button type="button"
-                            onclick="editProduct('${escapeHTML(id)}')">
-                            Edit
-                        </button>
-
-                        <button type="button"
-                            onclick="deleteProduct('${escapeHTML(id)}')">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join("");
-    }
-
-    // --------------------------------
-    // ADD / UPDATE PRODUCT
-    // --------------------------------
-
-    document.getElementById("productForm")
-        .addEventListener("submit", async function(event) {
-
-        event.preventDefault();
-
-        const product = {
-            name: document.getElementById("productName").value.trim(),
-            sku: document.getElementById("productSku").value.trim(),
-            category: document.getElementById("productCategory").value.trim(),
-            stock: Number(document.getElementById("productStock").value),
-            price: Number(document.getElementById("productPrice").value),
-            description: document.getElementById("productDescription").value.trim()
-        };
-
-        if (!product.name || !product.sku || !product.category ||
-            !Number.isFinite(product.stock) || product.stock < 0 ||
-            !Number.isFinite(product.price) || product.price < 0) {
-
-            showMessage("Please enter valid product details.", true);
-            return;
-        }
-
-        const submitBtn = document.getElementById("submitBtn");
-
-        submitBtn.disabled = true;
-
-        try {
-
-            const isEditing = editingProductId !== null;
-
-            const url = isEditing
-                ? `${PRODUCTS_API}/${encodeURIComponent(editingProductId)}`
-                : PRODUCTS_API;
-
-            const response = await fetch(url, {
-                method: isEditing ? "PUT" : "POST",
-                headers: getHeaders(true),
-                body: JSON.stringify(product)
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Product operation failed.");
-            }
-
-            showMessage(
-                isEditing
-                    ? "Product updated successfully!"
-                    : "Product added successfully!"
-            );
-
-            cancelEdit();
-            await loadProducts();
-
-        } catch (error) {
-
-            showMessage(error.message, true);
-
-        } finally {
-            submitBtn.disabled = false;
-        }
+async function api(path, options = {}) {
+    const response = await fetch(API + path, {
+        ...options,
+        headers: { ...headers(Boolean(options.body)), ...(options.headers || {}) }
     });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Request failed");
+    return data;
+}
 
-    // --------------------------------
-    // EDIT PRODUCT
-    // --------------------------------
+function currency(value) {
+    return Number(value || 0).toLocaleString("en-IN", {
+        style: "currency", currency: "INR", maximumFractionDigits: 2
+    });
+}
 
-    function editProduct(id) {
+function cell(row, value) {
+    const td = row.insertCell();
+    td.textContent = value == null ? "—" : String(value);
+    return td;
+}
 
-        const product = products.find(item =>
-            String(item._id || item.id) === String(id)
-        );
+async function loadProducts() {
+    const body = document.getElementById("productTableBody");
+    body.innerHTML = '<tr><td colspan="8">Loading...</td></tr>';
+    try {
+        const data = await api("/products");
+        products = (Array.isArray(data) ? data : data.products || [])
+            .filter(product => product.is_active !== false);
+        body.replaceChildren();
 
-        if (!product) {
-            showMessage("Product not found.", true);
+        if (!products.length) {
+            body.innerHTML = '<tr><td colspan="8">No active products found.</td></tr>';
             return;
         }
 
-        editingProductId = id;
+        products.forEach(product => {
+            const row = body.insertRow();
+            cell(row, product.name);
+            cell(row, product.sku);
+            cell(row, product.category);
+            cell(row, product.stock_quantity);
+            cell(row, product.reorder_level);
+            cell(row, currency(product.price));
 
-        document.getElementById("productName").value = product.name || "";
-        document.getElementById("productSku").value = product.sku || "";
-        document.getElementById("productCategory").value = product.category || "";
-        document.getElementById("productStock").value = product.stock ?? 0;
-        document.getElementById("productPrice").value = product.price ?? 0;
-        document.getElementById("productDescription").value =
-            product.description || "";
+            const stock = Number(product.stock_quantity || 0);
+            const threshold = Number(product.reorder_level || 0);
+            cell(row, stock === 0 ? "Out of stock" : stock <= threshold ? "Low stock" : "In stock");
 
-        document.getElementById("formTitle").textContent = "Edit Product";
-        document.getElementById("submitBtn").textContent = "Update Product";
-        document.getElementById("cancelBtn").hidden = false;
-
-        document.getElementById("productForm").scrollIntoView({
-            behavior: "smooth"
+            const actions = row.insertCell();
+            const edit = document.createElement("button");
+            edit.type = "button";
+            edit.textContent = "Edit";
+            edit.addEventListener("click", () => editProduct(product.id));
+            const archive = document.createElement("button");
+            archive.type = "button";
+            archive.textContent = "Archive";
+            archive.addEventListener("click", () => archiveProduct(product.id));
+            actions.append(edit, document.createTextNode(" "), archive);
         });
-    }
-
-    // --------------------------------
-    // CANCEL EDIT
-    // --------------------------------
-
-    function cancelEdit() {
-
-        editingProductId = null;
-
-        document.getElementById("productForm").reset();
-
-        document.getElementById("formTitle").textContent = "Add New Product";
-        document.getElementById("submitBtn").textContent = "Add Product";
-        document.getElementById("cancelBtn").hidden = true;
-    }
-
-    // --------------------------------
-    // DELETE PRODUCT
-    // --------------------------------
-
-    async function deleteProduct(id) {
-
-        const confirmed = confirm(
-            "Are you sure you want to delete this product?"
-        );
-
-        if (!confirmed) return;
-
-        try {
-
-            const response = await fetch(
-                `${PRODUCTS_API}/${encodeURIComponent(id)}`,
-                {
-                    method: "DELETE",
-                    headers: getHeaders()
-                }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Unable to delete product.");
-            }
-
-            showMessage("Product deleted successfully!");
-
-            if (String(editingProductId) === String(id)) {
-                cancelEdit();
-            }
-
-            await loadProducts();
-
-        } catch (error) {
-
-            showMessage(error.message, true);
+    } catch (error) {
+        body.innerHTML = '<tr><td colspan="8">Unable to load products.</td></tr>';
+        showMessage(error.message, true);
+        if (error.message.toLowerCase().includes("session")) {
+            sessionStorage.clear();
+            window.location.href = "index.html";
         }
     }
+}
 
-    // --------------------------------
-    // INITIALIZE INVENTORY
-    // --------------------------------
-
-    document.addEventListener("DOMContentLoaded", function() {
-
-        if (!getToken()) {
-            showMessage("Session expired. Please login again.", true);
+async function loadMovements() {
+    const body = document.getElementById("movementTableBody");
+    try {
+        const rows = await api("/inventory/movements?limit=100");
+        body.replaceChildren();
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="6">No stock movements yet.</td></tr>';
             return;
         }
+        rows.forEach(item => {
+            const row = body.insertRow();
+            cell(row, new Date(item.created_at).toLocaleString("en-IN"));
+            cell(row, item.products && item.products.name);
+            cell(row, item.movement_type);
+            cell(row, Number(item.quantity_delta) > 0 ? "+" + item.quantity_delta : item.quantity_delta);
+            cell(row, item.quantity_after);
+            cell(row, item.reason);
+        });
+    } catch (error) {
+        body.innerHTML = '<tr><td colspan="6">Stock history requires the approved database migration.</td></tr>';
+    }
+}
 
-        loadProducts();
-    });
+function editProduct(id) {
+    const product = products.find(item => String(item.id) === String(id));
+    if (!product) return showMessage("Product not found.", true);
 
+    editingId = id;
+    document.getElementById("productName").value = product.name || "";
+    document.getElementById("productSku").value = product.sku || "";
+    document.getElementById("productCategory").value = product.category || "";
+    document.getElementById("productStock").value = product.stock_quantity || 0;
+    document.getElementById("productPrice").value = product.price || 0;
+    document.getElementById("productCost").value = product.cost_price || 0;
+    document.getElementById("reorderLevel").value = product.reorder_level || 0;
+    document.getElementById("productDescription").value = product.description || "";
+    document.getElementById("formTitle").textContent = "Edit Product";
+    document.getElementById("submitBtn").textContent = "Save changes";
+    document.getElementById("cancelBtn").hidden = false;
+    document.getElementById("productForm").scrollIntoView({ behavior: "smooth" });
+}
+
+function resetForm() {
+    editingId = null;
+    document.getElementById("productForm").reset();
+    document.getElementById("productStock").value = 0;
+    document.getElementById("productCost").value = 0;
+    document.getElementById("reorderLevel").value = 5;
+    document.getElementById("formTitle").textContent = "Add Product";
+    document.getElementById("submitBtn").textContent = "Add Product";
+    document.getElementById("cancelBtn").hidden = true;
+}
+
+async function archiveProduct(id) {
+    if (!confirm("Archive this product? Historical order details will be preserved.")) return;
+    try {
+        const result = await api("/products/" + encodeURIComponent(id), { method: "DELETE" });
+        showMessage(result.message || "Product archived.");
+        await loadProducts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+document.getElementById("productForm").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const requestedStock = Number(document.getElementById("productStock").value);
+    const payload = {
+        name: document.getElementById("productName").value.trim(),
+        sku: document.getElementById("productSku").value.trim(),
+        category: document.getElementById("productCategory").value.trim(),
+        price: Number(document.getElementById("productPrice").value),
+        cost_price: Number(document.getElementById("productCost").value || 0),
+        reorder_level: Number(document.getElementById("reorderLevel").value || 0),
+        description: document.getElementById("productDescription").value.trim()
+    };
+
+    if (!payload.name || !payload.sku ||
+        ![requestedStock, payload.price, payload.cost_price, payload.reorder_level].every(Number.isFinite) ||
+        requestedStock < 0 || payload.price < 0 || payload.cost_price < 0 ||
+        payload.reorder_level < 0 || !Number.isInteger(requestedStock) ||
+        !Number.isInteger(payload.reorder_level)) {
+        return showMessage("Check the required fields, prices and whole-number stock values.", true);
+    }
+
+    const oldProduct = editingId
+        ? products.find(item => String(item.id) === String(editingId))
+        : null;
+    const oldStock = Number(oldProduct?.stock_quantity || 0);
+    const delta = requestedStock - oldStock;
+    let reason = "";
+
+    if (editingId && delta !== 0) {
+        reason = prompt("Enter the reason for this stock change:", "Physical stock count adjustment") || "";
+        if (reason.trim().length < 3) {
+            return showMessage("Stock was not changed because a movement reason is required.", true);
+        }
+    }
+
+    const button = document.getElementById("submitBtn");
+    button.disabled = true;
+
+    try {
+        const isEditing = Boolean(editingId);
+        const url = isEditing ? "/products/" + encodeURIComponent(editingId) : "/products";
+        const requestBody = isEditing
+            ? payload
+            : { ...payload, stock_quantity: requestedStock };
+
+        const result = await api(url, {
+            method: isEditing ? "PUT" : "POST",
+            body: JSON.stringify(requestBody)
+        });
+
+        if (isEditing && delta !== 0) {
+            await api("/inventory/movements", {
+                method: "POST",
+                body: JSON.stringify({
+                    product_id: editingId,
+                    quantity_delta: delta,
+                    reason: reason.trim()
+                })
+            });
+        }
+
+        showMessage(result.message || "Product saved successfully.");
+        resetForm();
+        await loadProducts();
+        await loadMovements();
+    } catch (error) {
+        showMessage(error.message, true);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+document.getElementById("cancelBtn").addEventListener("click", resetForm);
+document.getElementById("refreshProducts").addEventListener("click", async () => {
+    await loadProducts();
+    await loadMovements();
+});
+document.getElementById("logoutLink").addEventListener("click", () => {
+    sessionStorage.clear();
+    localStorage.removeItem("bizinsight_token");
+    localStorage.removeItem("bizinsight_user");
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+    if (!token()) {
+        window.location.href = "index.html";
+        return;
+    }
+    await loadProducts();
+    await loadMovements();
+});
 </script>
-
+<script>
+try {
+    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
+    if (navUser.role !== "admin") {
+        const adminLink = document.getElementById("adminUsersLink");
+        if (adminLink) adminLink.hidden = true;
+    }
+} catch (_) {
+    const adminLink = document.getElementById("adminUsersLink");
+    if (adminLink) adminLink.hidden = true;
+}
+</script>
+<script>
+(function(){
+ try {
+  const navUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+  if(!["admin","manager"].includes(navUser.role)){
+   const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+   const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+  }
+ } catch (_) {
+  const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+  const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+ }
+})();
+</script>
 </body>
 </html>

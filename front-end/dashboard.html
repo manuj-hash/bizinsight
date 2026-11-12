@@ -13,8 +13,11 @@
     <h2>BizInsight</h2>
     <a href="dashboard.html" class="active">🏠 Dashboard</a>
     <a href="inventory.html">📦 Inventory</a>
+    <a href="orders.html">Sales & Orders</a>
+    <a href="customers.html" id="customersNavLink">Customers</a>
     <a href="analytics.html">📊 Analytics</a>
     <a href="reports.html">📄 Reports</a>
+    <a href="staff.html" id="staffNavLink">Staff Management</a>
     <a href="profile.html">👤 Profile</a>
     <a href="#" id="logoutButton" class="lout">🚪 Logout</a>
 </div>
@@ -82,16 +85,16 @@
 
 <script>
 
-const API_URL = "http://localhost:3000/api";
+const API_URL = "/api";
 
-// Use localStorage consistently across all pages
+// Use tab-scoped session storage consistently across all pages
 function getToken() {
-    return localStorage.getItem("bizinsight_token");
+    return sessionStorage.getItem("bizinsight_token");
 }
 
 function getSavedUser() {
     try {
-        return JSON.parse(localStorage.getItem("bizinsight_user") || "{}");
+        return JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
     } catch {
         return {};
     }
@@ -114,7 +117,9 @@ document.getElementById("logoutButton").addEventListener("click", function(event
     event.preventDefault();
 
     localStorage.removeItem("bizinsight_token");
+    sessionStorage.removeItem("bizinsight_token");
     localStorage.removeItem("bizinsight_user");
+    sessionStorage.removeItem("bizinsight_user");
 
     window.location.href = "index.html";
 });
@@ -226,7 +231,9 @@ async function loadDashboard() {
             error.message.toLowerCase().includes("authentication")
         ) {
             localStorage.removeItem("bizinsight_token");
+            sessionStorage.removeItem("bizinsight_token");
             localStorage.removeItem("bizinsight_user");
+            sessionStorage.removeItem("bizinsight_user");
             window.location.href = "index.html";
         }
 
@@ -239,5 +246,31 @@ if (token) {
 
 </script>
 
+<script>
+try {
+    const navUser = JSON.parse(sessionStorage.getItem("bizinsight_user") || "{}");
+    if (navUser.role !== "admin") {
+        const adminLink = document.getElementById("adminUsersLink");
+        if (adminLink) adminLink.hidden = true;
+    }
+} catch (_) {
+    const adminLink = document.getElementById("adminUsersLink");
+    if (adminLink) adminLink.hidden = true;
+}
+</script>
+<script>
+(function(){
+ try {
+  const navUser=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
+  if(!["admin","manager"].includes(navUser.role)){
+   const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+   const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+  }
+ } catch (_) {
+  const customers=document.getElementById("customersNavLink");if(customers)customers.hidden=true;
+  const staff=document.getElementById("staffNavLink");if(staff)staff.hidden=true;
+ }
+})();
+</script>
 </body>
 </html>
