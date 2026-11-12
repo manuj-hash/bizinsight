@@ -137,7 +137,7 @@ async function loadStaff(){
    if(person.role==="admin"){actions.textContent="Protected administrator account";return;}
    const canEdit=me.role==="admin"||(me.role==="manager"&&accessPermissions.has("staff.manage")&&person.role==="staff"&&(me.manager_scope==="company"||person.department_id===me.department_id));
    if(!canEdit){actions.textContent="—";return;}
-   const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";
+   const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";edit.dataset.bizAction="staff.manage";
    edit.addEventListener("click",()=>editEmployee(person));
    actions.append(edit,document.createTextNode(" "));
    if(me.role==="admin"||accessPermissions.has("staff.compensation.manage")){
