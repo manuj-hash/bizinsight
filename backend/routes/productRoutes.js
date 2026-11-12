@@ -4,7 +4,7 @@ const protect=require("../middleware/authMiddleware");
 const requirePermission=protect.requirePermission;
 const {getProducts,getProduct,addProduct,updateProduct,deleteProduct}=require("../controllers/productController");
 router.use(protect);
-router.get("/",requirePermission("inventory.view"),getProducts);
+router.get("/",requirePermission("inventory.view","orders.view","reports.view"),getProducts);
 router.get("/:id",requirePermission("inventory.view"),getProduct);
 router.post("/",requirePermission("inventory.create"),addProduct);
 router.put("/:id",requirePermission("inventory.update"),updateProduct);
