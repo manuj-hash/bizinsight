@@ -259,7 +259,7 @@ const addComplaintResponse=async(req,res)=>{
 
 const listDepartmentMembers=async(req,res)=>{
     try{
-        if(!has(req,"communication.responsibility.manage"))return res.status(403).json({message:"Responsibility management is not granted"});
+        if(!has(req,"communication.responsibility.manage")||!["admin","manager"].includes(req.profile.role))return res.status(403).json({message:"Only Admin or an authorized Manager can manage announcement responsibility"});
         const departmentId=req.query.department_id||req.profile.department_id;
         if(!departmentId||(req.profile.role!=="admin"&&req.profile.manager_scope!=="company"&&departmentId!==req.profile.department_id))
             return res.status(403).json({message:"You cannot manage communicators for this department"});
