@@ -110,6 +110,12 @@ const createIssue=async(req,res)=>{
         if(req.profile.role!=="admin"&&affected_department_ids.some(id=>id!==department_id))
             return res.status(403).json({message:"Cross-department issue notification requires Admin authority"});
         const db=getAdminClient();
+        const targetDepartments=[...new Set([department_id,...affected_department_ids])];
+        const {data:validDepartments,error:departmentError}=await db.from("departments")
+            .select("id").in("id",targetDepartments).eq("is_active",true);
+        if(departmentError)throw departmentError;
+        if((validDepartments||[]).length!==targetDepartments.length)
+            return res.status(400).json({message:"One or more issue departments are invalid or inactive"});
         const {data:issueId,error}=await db.rpc("create_bizinsight_issue",{
             p_actor_id:req.user.id,
             p_department_id:department_id,
