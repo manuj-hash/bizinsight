@@ -55,7 +55,8 @@ async function init(){
    if(link.getAttribute("href")==="staff.html")link.textContent="User Management";
    const href=(link.getAttribute("href")||"").split("/").pop().split("?")[0];
    const required=hrefPermission[href];
-   if(required&&!admin&&!hasAny(required,granted))link.hidden=true;
+   if((href==="staff.html"||href==="access-control.html")&&data.role==="staff")link.hidden=true;
+   else if(required&&!admin&&!hasAny(required,granted))link.hidden=true;
   });
   const sidebar=document.querySelector(".sidebar");
   if(sidebar&&!sidebar.querySelector('a[href="communication.html"]')&&(admin||granted.has("communication.access"))){
@@ -71,6 +72,7 @@ async function init(){
   }
   const current=location.pathname.split("/").pop();
   const required=pageMap[current];
+  if((current==="staff.html"||current==="access-control.html")&&data.role==="staff"){location.replace("profile.html");return;}
   if(required&&required.length&&!admin&&!hasAny(required,granted)){
    const first=["dashboard.html","inventory.html","orders.html","customers.html","analytics.html","reports.html","staff.html","communication.html","profile.html"]
     .find(file=>file==="profile.html"||hasAny(hrefPermission[file]||[],granted));
