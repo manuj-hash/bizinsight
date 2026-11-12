@@ -91,6 +91,7 @@ const API="/api";
 const token=()=>sessionStorage.getItem("bizinsight_token");
 const me=JSON.parse(sessionStorage.getItem("bizinsight_user")||"{}");
 let departments=[], staff=[];
+let accessPermissions=new Set();
 const $=id=>document.getElementById(id);
 function showMessage(text,error=false){$("message").textContent=text;$("message").style.color=error?"#b42318":"#16794b";}
 function headers(json=false){if(!token())throw new Error("Session expired. Sign in again.");const h={Authorization:"Bearer "+token()};if(json)h["Content-Type"]="application/json";return h;}
@@ -124,21 +125,26 @@ async function loadStaff(){
   staff.forEach(person=>{
    const row=body.insertRow();
    cell(row,person.full_name);
+   cell(row,person.email);
+   cell(row,person.phone);
    cell(row,person.role==="admin"?"Admin":person.role==="manager"?(person.manager_scope==="company"?"Overall Manager":"Department Manager"):"General Staff");
    cell(row,person.department_name);
    cell(row,person.designation);
-   const salary=person.compensation;
-   cell(row,salary?Number(salary.base_salary).toLocaleString("en-IN",{style:"currency",currency:salary.currency_code||"INR",maximumFractionDigits:2})+" / "+salary.pay_frequency:"Not set");
+   const canViewSalary=me.role==="admin"||accessPermissions.has("staff.compensation.view");
+   const salary=canViewSalary?person.compensation:null;
+   cell(row,canViewSalary?(salary?Number(salary.base_salary).toLocaleString("en-IN",{style:"currency",currency:salary.currency_code||"INR",maximumFractionDigits:2})+" / "+salary.pay_frequency:"Not set"):"Restricted");
    const actions=row.insertCell();
    if(person.role==="admin"){actions.textContent="Protected administrator account";return;}
-   const canEdit=me.role==="admin"||(me.role==="manager"&&person.role==="staff"&&(me.manager_scope==="company"||person.department_id===me.department_id));
+   const canEdit=me.role==="admin"||(me.role==="manager"&&accessPermissions.has("staff.manage")&&person.role==="staff"&&(me.manager_scope==="company"||person.department_id===me.department_id));
    if(!canEdit){actions.textContent="—";return;}
-   const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";
+   const edit=document.createElement("button");edit.type="button";edit.textContent="Edit";edit.dataset.bizAction="staff.manage";
    edit.addEventListener("click",()=>editEmployee(person));
    actions.append(edit,document.createTextNode(" "));
-   const salaryBtn=document.createElement("button");salaryBtn.type="button";salaryBtn.textContent="Set salary";
-   salaryBtn.addEventListener("click",()=>setSalary(person));
-   actions.append(salaryBtn);
+   if(me.role==="admin"||accessPermissions.has("staff.compensation.manage")){
+    const salaryBtn=document.createElement("button");salaryBtn.type="button";salaryBtn.textContent="Set salary";
+    salaryBtn.addEventListener("click",()=>setSalary(person));
+    actions.append(salaryBtn);
+   }
   });
  }catch(error){body.innerHTML='<tr><td colspan="8">Unable to load employees.</td></tr>';showMessage(error.message,true);}
 }
@@ -229,7 +235,15 @@ $("role").value="staff";updateRoleControls();
 document.addEventListener("DOMContentLoaded",async()=>{
  if(!token()){location.href="index.html";return;}
  if(!["admin","manager"].includes(me.role)){showMessage("Staff Management is restricted to Admin and Managers.",true);document.querySelector(".container").hidden=true;return;}
- try{await loadDepartments();await loadPreferences();await loadStaff();}
+ try{
+  const access=await api("/permissions/me");
+  accessPermissions=new Set(access.permissions||[]);
+  const preferencesSection=$("preferencesForm").closest("section");
+  if(me.role!=="admin"&&!accessPermissions.has("staff.departments.manage"))preferencesSection.hidden=true;
+  await loadDepartments();
+  if(me.role==="admin"||accessPermissions.has("staff.departments.manage"))await loadPreferences();
+  await loadStaff();
+ }
  catch(error){showMessage(error.message,true);}
 });
 </script>

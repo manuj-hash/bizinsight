@@ -41,11 +41,13 @@ const createMessage = async (req,res) => {
         if(!["team","general"].includes(message_type))return res.status(400).json({message:"Invalid message type"});
         const db=getAdminClient();
         let departmentId=null;
+        let targetDepartments=[];
         if(message_type==="team"){
             if(!has(req,"communication.team"))return res.status(403).json({message:"Team communication access is not granted"});
             if(req.profile.role==="staff"||req.profile.manager_scope==="department")departmentId=req.profile.department_id;
             else departmentId=req.body.department_id||req.profile.department_id;
             if(!departmentId||!canSeeDepartment(req.profile,departmentId))return res.status(403).json({message:"You cannot post to this department"});
+            targetDepartments=[departmentId];
         }else{
             if(!has(req,"communication.general.publish"))return res.status(403).json({message:"General announcement publishing is not granted"});
             if(req.profile.role!=="admin"){
@@ -60,31 +62,28 @@ const createMessage = async (req,res) => {
             }
             if(!Array.isArray(target_department_ids)||!target_department_ids.length)
                 return res.status(400).json({message:"Select at least one receiving department"});
-            const uniqueTargets=[...new Set(target_department_ids)];
+            targetDepartments=[...new Set(target_department_ids)];
             const {data:validTargets,error:targetError}=await db.from("departments").select("id")
-                .in("id",uniqueTargets).eq("is_active",true);
+                .in("id",targetDepartments).eq("is_active",true);
             if(targetError)throw targetError;
-            if((validTargets||[]).length!==uniqueTargets.length)
+            if((validTargets||[]).length!==targetDepartments.length)
                 return res.status(400).json({message:"One or more receiving departments are invalid or inactive"});
-            req.body.target_department_ids=uniqueTargets;
         }
         if(typeof title!=="string"||title.trim().length<2||typeof body!=="string"||body.trim().length<2)
             return res.status(400).json({message:"A title and message are required"});
-        const {data,error}=await db.from("communication_messages").insert({
-            message_type,department_id:departmentId,target_department_ids:message_type==="general"?req.body.target_department_ids:[],
-            sender_id:req.user.id,title:title.trim(),body:body.trim(),priority
-        }).select().single();
+        const {data:messageId,error}=await db.rpc("publish_bizinsight_message",{
+            p_actor_id:req.user.id,
+            p_message_type:message_type,
+            p_department_id:departmentId,
+            p_target_department_ids:message_type==="general"?targetDepartments:[],
+            p_title:title.trim(),
+            p_body:body.trim(),
+            p_priority:priority
+        });
         if(error)throw error;
-        const recipients=message_type==="team"?[departmentId]:req.body.target_department_ids;
-        const {data:people,error:peopleError}=await db.from("profiles").select("id").in("department_id",recipients);
-        if(peopleError)throw peopleError;
-        const notifications=(people||[]).filter(p=>p.id!==req.user.id).map(p=>({
-            user_id:p.id,message_id:data.id,
-            notification_type:message_type==="team"?"team_message":"general_announcement",
-            title:data.title
-        }));
-        if(notifications.length){const saved=await db.from("communication_notifications").insert(notifications);if(saved.error)throw saved.error;}
-        return res.status(201).json({message:"Message published and recipients notified",item:data});
+        const {data:item,error:fetchError}=await db.from("communication_messages").select("*").eq("id",messageId).single();
+        if(fetchError)throw fetchError;
+        return res.status(201).json({message:"Message published and recipients notified",item});
     }catch(error){console.error("Create message:",error.message);return res.status(400).json({message:error.message||"Unable to publish message"});}
 };
 
@@ -107,21 +106,28 @@ const createIssue=async(req,res)=>{
         const {title,description,priority="normal",affected_department_ids=[]}=req.body;
         if(typeof title!=="string"||title.trim().length<2||typeof description!=="string"||description.trim().length<2)
             return res.status(400).json({message:"Issue title and description are required"});
+        if(!Array.isArray(affected_department_ids))return res.status(400).json({message:"Affected departments must be a list"});
         if(req.profile.role!=="admin"&&affected_department_ids.some(id=>id!==department_id))
             return res.status(403).json({message:"Cross-department issue notification requires Admin authority"});
-        const {data,error}=await getAdminClient().from("communication_issues").insert({
-            department_id,affected_department_ids,created_by:req.user.id,title:title.trim(),
-            description:description.trim(),priority
-        }).select().single();
+        const db=getAdminClient();
+        const targetDepartments=[...new Set([department_id,...affected_department_ids])];
+        const {data:validDepartments,error:departmentError}=await db.from("departments")
+            .select("id").in("id",targetDepartments).eq("is_active",true);
+        if(departmentError)throw departmentError;
+        if((validDepartments||[]).length!==targetDepartments.length)
+            return res.status(400).json({message:"One or more issue departments are invalid or inactive"});
+        const {data:issueId,error}=await db.rpc("create_bizinsight_issue",{
+            p_actor_id:req.user.id,
+            p_department_id:department_id,
+            p_affected_department_ids:[...new Set(affected_department_ids)],
+            p_title:title.trim(),
+            p_description:description.trim(),
+            p_priority:priority
+        });
         if(error)throw error;
-        const recipientDepartments=[department_id,...affected_department_ids];
-        const {data:people,error:peopleError}=await getAdminClient().from("profiles").select("id").in("department_id",recipientDepartments);
-        if(peopleError)throw peopleError;
-        const notifications=(people||[]).filter(p=>p.id!==req.user.id).map(p=>({
-            user_id:p.id,issue_id:data.id,notification_type:"work_issue",title:data.title
-        }));
-        if(notifications.length){const saved=await getAdminClient().from("communication_notifications").insert(notifications);if(saved.error)throw saved.error;}
-        return res.status(201).json({message:"Work issue reported and relevant teams notified",issue:data});
+        const {data:issue,error:fetchError}=await db.from("communication_issues").select("*").eq("id",issueId).single();
+        if(fetchError)throw fetchError;
+        return res.status(201).json({message:"Work issue reported and relevant teams notified",issue});
     }catch(error){console.error("Create issue:",error.message);return res.status(400).json({message:error.message||"Unable to report issue"});}
 };
 

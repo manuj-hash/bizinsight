@@ -64,7 +64,7 @@ const addProduct = async (req, res) => {
         }
 
         // Create with zero stock. Opening stock is added through the audited RPC.
-        const { data: product, error } = await req.supabase
+        const { data: product, error } = await getAdminClient()
             .from("products")
             .insert([{
                 sku: sku.trim(),
@@ -73,7 +73,6 @@ const addProduct = async (req, res) => {
                 category: category || null,
                 price: sellingPrice,
                 cost_price: costPrice,
-                stock_quantity: 0,
                 reorder_level: reorderLevel
             }])
             .select()
@@ -101,7 +100,7 @@ const addProduct = async (req, res) => {
             }
         }
 
-        const { data: savedProduct } = await req.supabase
+        const { data: savedProduct } = await getAdminClient()
             .from("products")
             .select("*")
             .eq("id", product.id)
@@ -164,7 +163,7 @@ const updateProduct = async (req, res) => {
             return res.status(400).json({ message: "No valid product fields provided" });
         }
 
-        const { data, error } = await req.supabase
+        const { data, error } = await getAdminClient()
             .from("products")
             .update(updates)
             .eq("id", req.params.id)
@@ -186,19 +185,20 @@ const updateProduct = async (req, res) => {
 // Archive instead of physically deleting a product referenced by historical orders.
 const deleteProduct = async (req, res) => {
     try {
-        const { data, error } = await req.supabase
-            .from("products")
-            .update({ is_active: false })
-            .eq("id", req.params.id)
-            .select()
-            .maybeSingle();
-
+        const db = getAdminClient();
+        const { data: archivedId, error } = await db.rpc("archive_bizinsight_product", {
+            p_actor_id: req.user.id,
+            p_product_id: req.params.id
+        });
         if (error) throw error;
-        if (!data) return res.status(404).json({ message: "Product not found" });
+        if (!archivedId) return res.status(404).json({ message: "Product not found" });
 
+        const { data: product, error: fetchError } = await db.from("products")
+            .select("*").eq("id", archivedId).single();
+        if (fetchError) throw fetchError;
         return res.status(200).json({
             message: "Product archived. Historical order records are preserved.",
-            product: data
+            product
         });
     } catch (error) {
         return res.status(400).json({ message: error.message || "Unable to archive product" });

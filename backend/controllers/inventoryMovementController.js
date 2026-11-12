@@ -46,7 +46,8 @@ const createMovement = async (req, res) => {
         );
         if (error) throw error;
 
-        const { data: movement, error: fetchError } = await req.supabase
+        // The route has checked inventory.stock_movement. Fetch with the server client so this action does not also require inventory.view.
+        const { data: movement, error: fetchError } = await getAdminClient()
             .from("inventory_movements")
             .select("id, product_id, movement_type, quantity_delta, quantity_before, quantity_after, reason, created_at, products(name, sku)")
             .eq("id", movementId)

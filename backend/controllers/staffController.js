@@ -24,26 +24,45 @@ const getStaff = async (req, res) => {
             }
         }
 
-        const [{ data: staff, error }, { data: departments, error: departmentError }] = await Promise.all([
-            query,
-            db.from("departments").select("id,name,is_active").order("name")
-        ]);
-        if (error) throw error;
+        const staffRows = [];
+        const PAGE_SIZE = 500;
+        for (let from = 0; ; from += PAGE_SIZE) {
+            const { data: page, error } = await query.range(from, from + PAGE_SIZE - 1);
+            if (error) throw error;
+            staffRows.push(...(page || []));
+            if (!page || page.length < PAGE_SIZE) break;
+        }
+
+        const { data: departments, error: departmentError } = await db.from("departments")
+            .select("id,name,is_active").order("name");
         if (departmentError) throw departmentError;
 
-        const staffRows = staff || [];
-        const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        if (authUsersError) throw authUsersError;
-        const emailById = new Map((authUsers.users || []).map(user => [user.id, user.email || null]));
+        // Auth Admin listUsers is paginated; fetch every page before mapping emails.
+        const authUsers = [];
+        for (let page = 1; ; page += 1) {
+            const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+            if (error) throw error;
+            const batch = data?.users || [];
+            authUsers.push(...batch);
+            if (batch.length < 1000) break;
+        }
+        const emailById = new Map(authUsers.map(user => [user.id, user.email || null]));
         const ids = staffRows.map(person => person.id);
         let compensation = [];
         const canViewCompensation = req.profile.role === "admin" ||
             (req.permissions && req.permissions.has("staff.compensation.view"));
         if (ids.length && canViewCompensation) {
-            const result = await db.from("employee_compensation")
-                .select("id,profile_id,base_salary,currency_code,pay_frequency,effective_from,effective_to")
-                .in("profile_id", ids)
-                .is("effective_to", null);
+            // Managers may view Staff compensation only; Admin may view all
+            // non-admin employee compensation.
+            const compensationIds = req.profile.role === "admin"
+                ? ids
+                : staffRows.filter(person => person.role === "staff").map(person => person.id);
+            const result = compensationIds.length
+                ? await db.from("employee_compensation")
+                    .select("id,profile_id,base_salary,currency_code,pay_frequency,effective_from,effective_to")
+                    .in("profile_id", compensationIds)
+                    .is("effective_to", null)
+                : { data: [], error: null };
             if (result.error) throw result.error;
             compensation = result.data || [];
         }
@@ -104,7 +123,19 @@ const inviteEmployee = async (req, res) => {
             p_manager_scope: role === "manager" ? scope : null,
             p_reports_to: role === "manager" ? reportsTo : (req.profile.role === "manager" ? req.user.id : null)
         });
-        if (assignError) throw assignError;
+        if (assignError) {
+            // Compensate for the Auth invitation if the database role/scope
+            // assignment fails; do not leave an invited account without a
+            // valid BizInsight employee profile.
+            const { error: cleanupError } = await db.auth.admin.deleteUser(data.user.id);
+            if (cleanupError) {
+                console.error("Failed to clean up unassigned invited user:", cleanupError.message);
+                return res.status(500).json({
+                    message: "Employee setup failed and the pending Auth invitation could not be removed. Contact Admin before retrying."
+                });
+            }
+            throw assignError;
+        }
 
         return res.status(201).json({
             message: role === "manager" ? "Manager invitation sent." : "Staff invitation sent.",

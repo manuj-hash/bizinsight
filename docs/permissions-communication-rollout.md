@@ -49,10 +49,11 @@ Rollout order:
 1. Confirm the actual migration filenames and inspect dependencies. The expected `002_order_lifecycle_and_stock_movements.sql` path was not found during the earlier source audit, so do not assume that file is present.
 2. Review the organization/department migration 003 and apply it only after its own prerequisites are confirmed.
 3. Review and apply migration 004.
-4. Run Supabase security advisors and verify the new tables have RLS enabled and no direct privileges for `anon` or `authenticated`.
-5. Pull/deploy the application branch and test with separate Admin, Manager and Staff accounts.
+4. Review and apply migration `005_access_notifications.sql` after migration 004; it depends on `permission_catalog`.
+5. Run Supabase security advisors and verify the new tables have RLS enabled and no direct privileges for `anon` or `authenticated`.
+6. Pull/deploy the application branch and test with separate Admin, Manager and Staff accounts.
 
-**No Supabase migration has been applied by this change.** The migration is committed as a reviewable file only.
+**No Supabase migration has been applied by this change.** Migrations 004 and 005 are committed as reviewable files only.
 
 ## Required test scenarios
 
@@ -62,6 +63,11 @@ Rollout order:
 - Manager cannot change Admin or another Manager, or grant outside their delegation.
 - Staff with Inventory view sees Inventory and inventory analytics, but not Dashboard, Orders, Customers, Reports or User Management unless separately granted.
 - Direct API calls to ungranted modules/actions return 403.
+- Granting a permission creates one English notification for the target user; repeating an already-active grant does not create a duplicate.
+- Revoking a permission creates one English notification for the target user; repeating an already-inactive revocation does not create a duplicate.
+- Creating, updating and revoking a Manager delegation creates the corresponding English notification for that Manager.
+- A user can list only their own access notifications and cannot mark another user's notification as read.
+- Access notification failure is logged but does not roll back a completed permission/delegation change.
 - General announcement sent by the active communicator creates notifications for targeted departments.
 - Backup communicator cannot publish until manually activated; switching back to primary is explicit.
 - Complaint submission is limited to three per calendar month; submitter and authorized reviewer can read the appropriate private responses.

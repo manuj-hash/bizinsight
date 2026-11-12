@@ -1,5 +1,47 @@
 const { getAdminClient } = require("../config/supabase");
 
+async function createAccessNotification(db, { userId, actorId, eventType, permissionCode, details = {} }) {
+    const templates = {
+        permission_granted: {
+            title: "Access permission granted",
+            message: `Your access to "${permissionCode}" has been granted. Sign in again if the change is not visible.`
+        },
+        permission_revoked: {
+            title: "Access permission revoked",
+            message: `Your access to "${permissionCode}" has been revoked. If you believe this is incorrect, contact your administrator.`
+        },
+        delegation_granted: {
+            title: "Manager authority delegated",
+            message: `You have been granted authority for "${permissionCode}". Review your Access Control page for the scope and actions.`
+        },
+        delegation_updated: {
+            title: "Manager authority updated",
+            message: `Your delegated authority for "${permissionCode}" has been updated. Review your Access Control page for the current scope and actions.`
+        },
+        delegation_revoked: {
+            title: "Manager authority revoked",
+            message: `Your delegated authority for "${permissionCode}" has been revoked.`
+        }
+    };
+    const template = templates[eventType];
+    if (!template) throw new Error("Unsupported access notification event");
+    const { data: permission } = await db.from("permission_catalog")
+        .select("label").eq("code", permissionCode).maybeSingle();
+    const permissionLabel = permission?.label || permissionCode;
+    const message = template.message.replaceAll(permissionCode, permissionLabel);
+    const { error } = await db.from("access_notifications").insert({
+        user_id: userId,
+        actor_id: actorId,
+        event_type: eventType,
+        permission_code: permissionCode,
+        title: template.title,
+        message,
+        details
+    });
+    if (error) throw error;
+}
+
+
 const catalog = async (req, res) => {
     try {
         const db = getAdminClient();
@@ -78,6 +120,7 @@ const setDelegation = async (req, res) => {
             .eq("permission_code", permission_code).eq("is_active", true)
             .is("department_id", department_id).maybeSingle();
         if (existing.error) throw existing.error;
+        const previous = existing.data;
         let saved;
         if (existing.data) {
             const result = await db.from("manager_delegations").update({
@@ -101,6 +144,15 @@ const setDelegation = async (req, res) => {
             details: { department_id, can_grant: Boolean(can_grant), can_revoke: Boolean(can_revoke) }
         });
         if (auditError) throw auditError;
+        const eventType = !is_active ? "delegation_revoked" : previous ? "delegation_updated" : "delegation_granted";
+        try {
+            await createAccessNotification(db, {
+                userId: manager_id, actorId: req.user.id, eventType, permissionCode: permission_code,
+                details: { department_id, can_grant: Boolean(can_grant), can_revoke: Boolean(can_revoke) }
+            });
+        } catch (notificationError) {
+            console.error("Access notification delivery failed:", notificationError.message);
+        }
         return res.json({ message: "Manager delegation updated", delegation: saved });
     } catch (error) {
         console.error("Set delegation:", error.message);
@@ -144,6 +196,7 @@ const changeStaffPermission = async (req, res) => {
         if (!(await canManagerChange(db, req.profile, target, permission_code, action))) {
             return res.status(403).json({ message: "You have not been delegated authority to perform this permission change for this Staff member" });
         }
+        let permissionChanged = false;
         if (action === "grant") {
             const { data: current, error: currentError } = await db.from("user_permissions").select("id")
                 .eq("user_id", id).eq("permission_code", permission_code).eq("is_active", true).maybeSingle();
@@ -153,18 +206,31 @@ const changeStaffPermission = async (req, res) => {
                     user_id: id, permission_code, granted_by: req.user.id, is_active: true
                 });
                 if (error) throw error;
+                permissionChanged = true;
             }
         } else {
-            const { error } = await db.from("user_permissions").update({
+            const { data: revokedRows, error } = await db.from("user_permissions").update({
                 is_active: false, revoked_by: req.user.id, revoked_at: new Date().toISOString()
-            }).eq("user_id", id).eq("permission_code", permission_code).eq("is_active", true);
+            }).eq("user_id", id).eq("permission_code", permission_code).eq("is_active", true).select("id");
             if (error) throw error;
+            permissionChanged = Boolean(revokedRows && revokedRows.length);
         }
+        if (!permissionChanged) return res.json({ message: action === "grant" ? "Staff permission is already active" : "Staff permission is already inactive" });
         const { error: auditError } = await db.from("permission_audit_logs").insert({
             actor_id: req.user.id, target_user_id: id, permission_code, action,
             details: { department_id: target.department_id }
         });
         if (auditError) throw auditError;
+        try {
+            await createAccessNotification(db, {
+                userId: id, actorId: req.user.id,
+                eventType: action === "grant" ? "permission_granted" : "permission_revoked",
+                permissionCode: permission_code,
+                details: { department_id: target.department_id }
+            });
+        } catch (notificationError) {
+            console.error("Access notification delivery failed:", notificationError.message);
+        }
         return res.json({ message: action === "grant" ? "Staff permission granted" : "Staff permission deactivated" });
     } catch (error) {
         console.error("Staff permission change:", error.message);
@@ -172,4 +238,40 @@ const changeStaffPermission = async (req, res) => {
     }
 };
 
-module.exports = { catalog, getDelegations, setDelegation, changeStaffPermission };
+
+const listAccessNotifications = async (req, res) => {
+    try {
+        const { data, error } = await getAdminClient()
+            .from("access_notifications")
+            .select("id,event_type,permission_code,title,message,details,created_at,read_at")
+            .eq("user_id", req.user.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+        if (error) throw error;
+        return res.json(data || []);
+    } catch (error) {
+        console.error("Access notifications:", error.message);
+        return res.status(500).json({ message: "Unable to load access notifications" });
+    }
+};
+
+const markAccessNotificationRead = async (req, res) => {
+    try {
+        const { data, error } = await getAdminClient()
+            .from("access_notifications")
+            .update({ read_at: new Date().toISOString() })
+            .eq("id", req.params.notificationId)
+            .eq("user_id", req.user.id)
+            .is("read_at", null)
+            .select("id,read_at")
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) return res.status(404).json({ message: "Access notification not found" });
+        return res.json({ message: "Access notification marked as read", notification: data });
+    } catch (error) {
+        console.error("Mark access notification read:", error.message);
+        return res.status(500).json({ message: "Unable to update access notification" });
+    }
+};
+
+module.exports = { catalog, getDelegations, setDelegation, changeStaffPermission, listAccessNotifications, markAccessNotificationRead };

@@ -278,6 +278,9 @@ BEGIN
   SELECT * INTO v_employee FROM public.profiles WHERE id = p_employee_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Employee profile not found'; END IF;
   IF v_employee.role = 'admin' THEN RAISE EXCEPTION 'Admin accounts cannot be managed here'; END IF;
+  IF v_actor.role = 'manager' AND v_employee.role <> 'staff' THEN
+    RAISE EXCEPTION 'Managers can manage Staff accounts only; Manager accounts are protected';
+  END IF;
 
   IF v_actor.role = 'manager' THEN
     IF p_role <> 'staff' THEN RAISE EXCEPTION 'Only Admin can appoint Managers'; END IF;
@@ -404,6 +407,9 @@ BEGIN
   END IF;
   IF v_employee.id IS NULL OR v_employee.role = 'admin' THEN
     RAISE EXCEPTION 'Administrator compensation cannot be managed through Staff Management';
+  END IF;
+  IF v_actor.role = 'manager' AND v_employee.role <> 'staff' THEN
+    RAISE EXCEPTION 'Managers can manage Staff compensation only; Manager accounts are protected';
   END IF;
   IF v_actor.role = 'manager' AND v_actor.manager_scope = 'department'
      AND v_actor.department_id IS DISTINCT FROM v_employee.department_id THEN
