@@ -9,7 +9,7 @@ const pageMap={
  "customers.html":["customers.view"],
  "analytics.html":["analytics.view","inventory.view"],
  "reports.html":["reports.view"],
- "staff.html":["staff.view"],
+ "staff.html":["staff.view","staff.manage"],
  "access-control.html":["staff.view"],
  "communication.html":["communication.access"],
  "profile.html":[]
@@ -102,9 +102,15 @@ function applyActionVisibility(granted,admin){
  hide(document.getElementById("departmentForm"),!can("staff.departments.manage"));
  hide(document.getElementById("createDepartmentButton"),!can("staff.departments.manage"));
  hide(document.getElementById("preferencesForm"),!can("staff.departments.manage"));
+ const currentPage=location.pathname.split("/").pop();
  document.querySelectorAll("button").forEach(button=>{
   const label=(button.textContent||"").trim().toLowerCase();
   if(label.includes("download report"))hide(button,!can("reports.export"));
+  if(currentPage==="staff.html"){
+   if(label==="edit")hide(button,!can("staff.manage"));
+   if(label.includes("set salary"))hide(button,!can("staff.compensation.manage"));
+   return;
+  }
   if(label.includes("stock movement")||label.includes("adjust stock"))hide(button,!can("inventory.stock_movement"));
   if(label==="add product")hide(button,!can("inventory.create"));
   if(label.includes("create order"))hide(button,!can("orders.create"));
