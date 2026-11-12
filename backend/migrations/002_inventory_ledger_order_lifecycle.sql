@@ -1,3 +1,5 @@
+BEGIN;
+
 -- BizInsight Phase 1: stock ledger, safe order lifecycle, customer archive, and role protection.
 -- IMPORTANT: Review and apply only after confirming the target Supabase project and taking a backup.
 -- This migration is intentionally committed to GitHub but is NOT applied to the live database by this change.
@@ -494,3 +496,6 @@ REVOKE ALL ON FUNCTION public.admin_update_bizinsight_user_role(uuid, text)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_update_bizinsight_user_role(uuid, text)
   TO service_role;
+
+
+COMMIT;
