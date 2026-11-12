@@ -112,7 +112,7 @@ const updateEmployee = async (req, res) => {
     try {
         const db = adminClient();
         const { data: target, error: targetError } = await db.from("profiles")
-            .select("id,role,department_id,manager_scope")
+            .select("id,role,department_id,manager_scope,reports_to")
             .eq("id", req.params.id).maybeSingle();
         if (targetError) throw targetError;
         if (!target) return res.status(404).json({ message: "Employee not found" });
@@ -136,7 +136,7 @@ const updateEmployee = async (req, res) => {
             p_department_id: departmentId,
             p_designation: req.body.designation === undefined ? null : String(req.body.designation).trim(),
             p_manager_scope: role === "manager" ? (req.body.manager_scope || target.manager_scope) : null,
-            p_reports_to: role === "manager" ? (req.body.reports_to || null) : (req.profile.role === "manager" ? req.user.id : null)
+            p_reports_to: role === "manager" ? (req.body.reports_to || target.reports_to || null) : (req.profile.role === "manager" ? req.user.id : null)
         });
         if (error) throw error;
         return res.json({ message: "Staff record updated.", employee: data });
