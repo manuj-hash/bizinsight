@@ -16,6 +16,7 @@ router.get("/complaints",c.listComplaints);
 router.get("/complaint-targets",c.listComplaintTargets);
 router.post("/complaints",c.submitComplaint);
 router.patch("/complaints/:id",c.updateComplaint);
+router.get("/complaints/:id/responses",c.listComplaintResponses);
 router.post("/complaints/:id/responses",c.addComplaintResponse);
 router.get("/responsibilities",c.listResponsibilities);
 router.put("/responsibilities",c.setResponsibility);
