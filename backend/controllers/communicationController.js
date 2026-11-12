@@ -189,6 +189,17 @@ const listResponsibilities=async(req,res)=>{
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
 };
 
+const listComplaintTargets=async(req,res)=>{
+    try{
+        if(!has(req,"communication.complaints.submit"))return res.status(403).json({message:"Complaint submission is not granted"});
+        let query=getAdminClient().from("profiles").select("id,full_name,role,department_id").neq("id",req.user.id).neq("role","admin").order("full_name");
+        if(req.profile.role==="staff")query=query.eq("department_id",req.profile.department_id);
+        else if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("department_id",req.profile.department_id);
+        const {data,error}=await query;if(error)throw error;
+        return res.json(data||[]);
+    }catch(error){return res.status(500).json({message:"Unable to load complaint targets"});}
+};
+
 const listAnnouncementDepartments=async(req,res)=>{
     try{
         if(!has(req,"communication.general.publish"))return res.status(403).json({message:"General announcement publishing is not granted"});
@@ -215,4 +226,4 @@ const markNotificationRead=async(req,res)=>{
     }catch(error){return res.status(400).json({message:"Unable to update notification"});}
 };
 
-module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments};
+module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets};
