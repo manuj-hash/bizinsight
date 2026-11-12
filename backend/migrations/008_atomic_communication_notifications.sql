@@ -34,7 +34,7 @@ BEGIN
 
   target_ids := CASE
     WHEN p_message_type='team' THEN ARRAY[p_department_id]
-    ELSE ARRAY(SELECT DISTINCT unnest(p_target_department_ids))
+    ELSE ARRAY(SELECT DISTINCT target.department_id FROM unnest(p_target_department_ids) AS target(department_id))
   END;
 
   INSERT INTO public.communication_messages(
@@ -90,8 +90,8 @@ BEGIN
   END IF;
 
   target_ids := ARRAY(
-    SELECT DISTINCT x
-    FROM unnest(ARRAY[p_department_id] || coalesce(p_affected_department_ids,'{}'::uuid[])) AS x
+    SELECT DISTINCT target.department_id
+    FROM unnest(ARRAY[p_department_id] || coalesce(p_affected_department_ids,'{}'::uuid[])) AS target(department_id)
   );
 
   INSERT INTO public.communication_issues(
