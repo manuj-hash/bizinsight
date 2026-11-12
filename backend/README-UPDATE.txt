@@ -40,13 +40,20 @@ npm.cmd start
 - Orders are business records and should not be physically deleted.
 - Stock must be changed through the inventory movement API, not by editing `stock_quantity` directly.
 
+## Customer privacy
+
+- Orders for unqualified buyers keep only an HMAC fingerprint in the private schema; names, emails, phones and addresses are not stored in a customer profile until configured frequent-order or high-value thresholds are met.
+- Set `CUSTOMER_IDENTITY_SECRET` to a long random server-only value. Keep it stable and never commit it. Changing it prevents recognition of prior anonymous buyer fingerprints.
+
 ## Database migrations
 
 `001_admin_staff_and_atomic_orders.sql` is the existing foundation migration.
 
 `002_inventory_ledger_order_lifecycle.sql` is a proposed Phase 1 migration that creates the stock ledger, protects stock updates, adds atomic order cancellation/restocking, customer archival support, and last-admin-safe role changes.
 
-**Migration 002 has been committed for review only. It has NOT been applied to Supabase.** Back up the project, review the SQL, and obtain explicit approval before applying it to the live project. The new inventory movement, customer archive, order lifecycle and role-update APIs depend on it.
+`003_staff_departments_customer_preferences.sql` is a proposed Phase 1.1 migration for Admin/Manager/General Staff roles, one company-wide Manager or multiple Department Managers under that Manager, departments, salary history, preferences and privacy-preserving valuable-customer qualification.
+
+**Migrations 002 and 003 are committed for review only. They have NOT been applied to Supabase.** Back up the project, review the SQL, and obtain explicit approval before applying it to the live project. The new inventory movement, customer archive, order lifecycle and role-update APIs depend on it.
 
 ## API groups
 
@@ -56,7 +63,8 @@ npm.cmd start
 - `/api/customers`: customer management
 - `/api/orders`: order creation and lifecycle
 - `/api/analytics`: dashboard, sales and inventory analytics
-- `/api/users`: profile and admin/staff management
+- `/api/users`: self-profile and password operations
+- `/api/staff`: Admin/Manager staff, departments, compensation and preferences
 
 ## Verification
 
