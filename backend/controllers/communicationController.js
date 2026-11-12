@@ -64,11 +64,11 @@ const createMessage = async (req,res) => {
         if(typeof title!=="string"||title.trim().length<2||typeof body!=="string"||body.trim().length<2)
             return res.status(400).json({message:"A title and message are required"});
         const {data,error}=await db.from("communication_messages").insert({
-            message_type,department_id:departmentId,target_department_ids:message_type==="general"?target_department_ids:[],
+            message_type,department_id:departmentId,target_department_ids:message_type==="general"?req.body.target_department_ids:[],
             sender_id:req.user.id,title:title.trim(),body:body.trim(),priority
         }).select().single();
         if(error)throw error;
-        const recipients=message_type==="team"?[departmentId]:target_department_ids;
+        const recipients=message_type==="team"?[departmentId]:req.body.target_department_ids;
         const {data:people,error:peopleError}=await db.from("profiles").select("id").in("department_id",recipients);
         if(peopleError)throw peopleError;
         const notifications=(people||[]).filter(p=>p.id!==req.user.id).map(p=>({
