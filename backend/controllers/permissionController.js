@@ -22,6 +22,17 @@ const catalog = async (req, res) => {
             delegations: delegated || []
         });
     } catch (error) {
+        if (["42P01","PGRST205","PGRST204"].includes(error.code)) {
+            return res.json({
+                role: req.profile.role,
+                department_id: req.profile.department_id,
+                permissions: [],
+                catalog: [],
+                delegations: [],
+                schema_ready: false,
+                message: "Permission database migration is not installed yet."
+            });
+        }
         console.error("Permission catalog:", error.message);
         return res.status(500).json({ message: "Unable to load permissions" });
     }
