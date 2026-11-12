@@ -50,8 +50,7 @@ const createMessage = async (req,res) => {
             }
             if(!Array.isArray(target_department_ids)||!target_department_ids.length)
                 return res.status(400).json({message:"Select at least one receiving department"});
-            if(req.profile.role!=="admin" && target_department_ids.some(id=>id!==req.profile.department_id))
-                return res.status(403).json({message:"Your announcement scope does not allow those departments"});
+            
         }
         if(typeof title!=="string"||title.trim().length<2||typeof body!=="string"||body.trim().length<2)
             return res.status(400).json({message:"A title and message are required"});
@@ -75,7 +74,7 @@ const createMessage = async (req,res) => {
 
 const listIssues = async(req,res)=>{
     try{
-        if(!has(req,"communication.access")&&!has(req,"communication.issues.access"))return res.status(403).json({message:"Work issue access has not been granted"});
+        if(!has(req,"communication.issues.access"))return res.status(403).json({message:"Work issue access has not been granted"});
         const db=getAdminClient();
         let query=db.from("communication_issues").select("*").order("created_at",{ascending:false}).limit(200);
         if(req.profile.role==="staff")query=query.or(`department_id.eq.${req.profile.department_id},assigned_to.eq.${req.user.id}`);
@@ -190,6 +189,14 @@ const listResponsibilities=async(req,res)=>{
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
 };
 
+const listAnnouncementDepartments=async(req,res)=>{
+    try{
+        if(!has(req,"communication.general.publish"))return res.status(403).json({message:"General announcement publishing is not granted"});
+        const {data,error}=await getAdminClient().from("departments").select("id,name").eq("is_active",true).order("name");
+        if(error)throw error;return res.json(data||[]);
+    }catch(error){return res.status(500).json({message:"Unable to load announcement departments"});}
+};
+
 const listNotifications=async(req,res)=>{
     try{
         const {data,error}=await getAdminClient().from("communication_notifications")
@@ -208,4 +215,4 @@ const markNotificationRead=async(req,res)=>{
     }catch(error){return res.status(400).json({message:"Unable to update notification"});}
 };
 
-module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead};
+module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments};
