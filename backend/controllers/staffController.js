@@ -160,6 +160,9 @@ const updateEmployee = async (req, res) => {
         if (targetError) throw targetError;
         if (!target) return res.status(404).json({ message: "Employee not found" });
         if (target.role === "admin") return res.status(403).json({ message: "Admin accounts cannot be managed here" });
+        if (req.profile.role === "manager" && target.role !== "staff") {
+            return res.status(403).json({ message: "Managers can manage Staff accounts only. Manager accounts are protected." });
+        }
 
         const role = req.body.role || target.role;
         const managerScope = role === "manager"
