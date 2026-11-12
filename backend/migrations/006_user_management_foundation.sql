@@ -153,7 +153,7 @@ GRANT EXECUTE ON FUNCTION private.can_view_employee_compensation(uuid) TO authen
 
 -- 4. Restrict profile self-service updates to non-privileged identity fields.
 -- This prevents users from changing their own role or manager assignment via the Data API.
-REVOKE UPDATE ON TABLE public.profiles FROM anon, authenticated;
+REVOKE UPDATE ON TABLE public.profiles FROM PUBLIC, anon, authenticated;
 GRANT UPDATE (full_name, phone) ON TABLE public.profiles TO authenticated;
 
 -- 5. RLS and grants for the new tables.
