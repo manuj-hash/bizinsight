@@ -1,19 +1,10 @@
-const express = require("express");
-const router = express.Router();
-
-const protect = require("../middleware/authMiddleware");
-const { allowRoles } = protect;
-
-const {
-    getDashboardAnalytics,
-    getSalesAnalytics,
-    getInventoryAnalytics
-} = require("../controllers/analyticsController");
-
-router.use(protect, allowRoles("admin", "staff"));
-
-router.get("/", getDashboardAnalytics);
-router.get("/sales", getSalesAnalytics);
-router.get("/inventory", getInventoryAnalytics);
-
-module.exports = router;
+const express=require("express");
+const router=express.Router();
+const protect=require("../middleware/authMiddleware");
+const requirePermission=protect.requirePermission;
+const {getDashboardAnalytics,getSalesAnalytics,getInventoryAnalytics}=require("../controllers/analyticsController");
+router.use(protect);
+router.get("/",requirePermission("analytics.view"),getDashboardAnalytics);
+router.get("/sales",requirePermission("analytics.view"),getSalesAnalytics);
+router.get("/inventory",requirePermission("inventory.view","analytics.view"),getInventoryAnalytics);
+module.exports=router;
