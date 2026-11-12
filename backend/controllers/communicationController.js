@@ -194,7 +194,7 @@ const listResponsibilities=async(req,res)=>{
     try{
         if(!has(req,"communication.responsibility.manage")&&!has(req,"communication.general.publish"))return res.status(403).json({message:"Responsibility view is not granted"});
         let query=getAdminClient().from("communication_responsibilities").select("*");
-        if(req.profile.role==="manager"&&req.profile.manager_scope==="department")query=query.eq("department_id",req.profile.department_id);
+        if(req.profile.role==="staff"||(req.profile.role==="manager"&&req.profile.manager_scope==="department"))query=query.eq("department_id",req.profile.department_id);
         const {data,error}=await query;if(error)throw error;return res.json(data||[]);
     }catch(error){return res.status(500).json({message:"Unable to load communication responsibility"});}
 };
