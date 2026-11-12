@@ -9,7 +9,7 @@ const pageMap={
  "customers.html":["customers.view"],
  "analytics.html":["analytics.view","inventory.view"],
  "reports.html":["reports.view"],
- "staff.html":["staff.view"],
+ "staff.html":["staff.view","staff.manage"],
  "access-control.html":["staff.view"],
  "communication.html":["communication.access"],
  "profile.html":[]
@@ -110,7 +110,7 @@ function applyActionVisibility(granted,admin){
   if(label.includes("create order"))hide(button,!can("orders.create"));
   if(label.includes("update status")||label.includes("cancel order"))hide(button,!can("orders.update"));
   if(label==="edit")hide(button,!can("inventory.update")&&!can("orders.update"));
-  if(label.includes("archive")||label.includes("delete"))hide(button,!can("inventory.archive"));
+  if(label.includes("archive")||label.includes("delete"))hide(button,!admin);
  });
 }
 async function init(){
