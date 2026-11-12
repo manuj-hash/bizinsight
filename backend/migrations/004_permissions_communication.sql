@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.manager_delegations (
   is_active boolean NOT NULL DEFAULT true,
   granted_at timestamptz NOT NULL DEFAULT now(),
   revoked_at timestamptz,
-  CHECK (can_grant OR can_revoke),
+  CHECK (can_grant OR can_revoke OR NOT is_active),
   CHECK ((is_active AND revoked_at IS NULL) OR (NOT is_active AND revoked_at IS NOT NULL))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS manager_delegations_one_active_uidx
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS public.communication_notifications (
   title text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   read_at timestamptz,
-  CHECK ((message_id IS NOT NULL)::integer + (issue_id IS NOT NULL)::integer = 1)
+  CHECK ((message_id IS NOT NULL AND issue_id IS NULL) OR (message_id IS NULL AND issue_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS communication_notifications_user_unread_idx
   ON public.communication_notifications(user_id,created_at DESC) WHERE read_at IS NULL;
@@ -232,10 +232,14 @@ BEGIN
 
   IF v_submitter.role='manager' THEN
     IF v_target.role NOT IN ('staff','manager') THEN RAISE EXCEPTION 'Invalid complaint target'; END IF;
+    IF v_submitter.manager_scope='department'
+       AND v_target.department_id IS DISTINCT FROM v_submitter.department_id THEN
+      RAISE EXCEPTION 'Department Managers can complain only about employees in their department';
+    END IF;
     v_recipient_role := 'admin';
     v_department_id := NULL;
   ELSIF v_submitter.role='staff' THEN
-    IF v_target.role='manager' THEN
+    IF v_target.role='manager' AND v_target.department_id IS NOT DISTINCT FROM v_submitter.department_id THEN
       v_recipient_role := 'admin';
       v_department_id := NULL;
     ELSIF v_target.role='staff' AND v_target.department_id=v_submitter.department_id THEN
