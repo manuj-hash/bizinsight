@@ -219,6 +219,21 @@ const updateComplaint=async(req,res)=>{
         if(error)throw error;return res.json({message:"Complaint status updated",complaint:data});
     }catch(error){console.error("Complaint update:",error.message);return res.status(400).json({message:error.message||"Unable to update complaint"});}
 };
+const listComplaintResponses=async(req,res)=>{
+    try{
+        const db=getAdminClient();
+        const {data:complaint,error:findError}=await db.from("communication_complaints")
+            .select("id,submitted_by,department_id,recipient_role").eq("id",req.params.id).maybeSingle();
+        if(findError)throw findError;if(!complaint)return res.status(404).json({message:"Complaint not found"});
+        const own=complaint.submitted_by===req.user.id;
+        const reviewer=has(req,"communication.complaints.review")&&await complaintCanReview(db,req.profile,complaint);
+        if(req.profile.role!=="admin"&&!own&&!reviewer)return res.status(403).json({message:"You cannot view this complaint's confidential responses"});
+        const {data,error}=await db.from("communication_complaint_responses").select("id,responder_id,body,created_at")
+            .eq("complaint_id",req.params.id).order("created_at");
+        if(error)throw error;return res.json(data||[]);
+    }catch(error){return res.status(500).json({message:"Unable to load confidential responses"});}
+};
+
 const addComplaintResponse=async(req,res)=>{
     try{
         const db=getAdminClient();
@@ -289,4 +304,4 @@ const markNotificationRead=async(req,res)=>{
     }catch(error){return res.status(400).json({message:"Unable to update notification"});}
 };
 
-module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets,listDepartmentMembers,updateComplaint,addComplaintResponse};
+module.exports={listMessages,createMessage,listIssues,createIssue,updateIssue,submitComplaint,listComplaints,setResponsibility,listResponsibilities,listNotifications,markNotificationRead,listAnnouncementDepartments,listComplaintTargets,listDepartmentMembers,updateComplaint,addComplaintResponse,listComplaintResponses};
