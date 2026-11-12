@@ -16,6 +16,7 @@ const getStaff = async (req, res) => {
             .select("id,full_name,phone,role,department_id,designation,manager_scope,reports_to,created_at,updated_at")
             .order("created_at", { ascending: false });
 
+        if (req.profile.role === "staff") return res.status(403).json({ message: "Staff accounts cannot browse employee management records" });
         if (req.profile.role === "manager") {
             query = query.neq("role", "admin");
             if (req.profile.manager_scope === "department") {
@@ -154,6 +155,7 @@ const updateEmployee = async (req, res) => {
 
 const getDepartments = async (req, res) => {
     try {
+        if (req.profile.role === "staff") return res.status(403).json({ message: "Department management is not available to Staff accounts" });
         let query = adminClient().from("departments")
             .select("id,name,description,is_active,created_at").order("name");
         if (req.profile.role === "manager" && req.profile.manager_scope === "department") {
