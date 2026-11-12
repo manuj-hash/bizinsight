@@ -6,9 +6,9 @@ const ORDER_SELECT = "id, order_number, customer_id, status, subtotal, tax_amoun
 function customerFingerprint({ email, phone }) {
     const secret = process.env.CUSTOMER_IDENTITY_SECRET;
     if (!secret) throw new Error("CUSTOMER_IDENTITY_SECRET is required to securely identify repeat buyers");
-    const identity = email
-        ? "email:" + email.trim().toLowerCase()
-        : "phone:" + phone.replace(/[^\d+]/g, "");
+    const identity = phone
+        ? "phone:" + phone.replace(/[^\d+]/g, "")
+        : "email:" + email.trim().toLowerCase();
     if (identity.endsWith(":")) throw new Error("A valid email or phone number is required");
     return crypto.createHmac("sha256", secret).update(identity).digest("hex");
 }
