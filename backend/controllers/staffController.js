@@ -36,9 +36,15 @@ const getStaff = async (req, res) => {
         if (departmentError) throw departmentError;
 
         const staffRows = staff || [];
-        const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        if (authUsersError) throw authUsersError;
-        const emailById = new Map((authUsers.users || []).map(user => [user.id, user.email || null]));
+        const emailById = new Map();
+        const perPage = 1000;
+        for (let page = 1; ; page += 1) {
+            const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page, perPage });
+            if (authUsersError) throw authUsersError;
+            const users = authUsers.users || [];
+            users.forEach(user => emailById.set(user.id, user.email || null));
+            if (users.length < perPage) break;
+        }
         const ids = staffRows.map(person => person.id);
         let compensation = [];
         const canViewCompensation = req.profile.role === "admin" ||
