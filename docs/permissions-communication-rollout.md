@@ -46,8 +46,8 @@ Some operations are deliberately reserved for Admin/Manager accounts (e.g. staff
 Migration `004_permissions_communication.sql` depends on the existing `profiles` and `departments` organization structure from migration 003. Migration 003 itself documents that it must follow migration 002.
 
 Rollout order:
-1. Review and apply migration 002.
-2. Review and apply migration 003.
+1. Confirm the actual migration filenames and inspect dependencies. The expected `002_order_lifecycle_and_stock_movements.sql` path was not found during the earlier source audit, so do not assume that file is present.
+2. Review the organization/department migration 003 and apply it only after its own prerequisites are confirmed.
 3. Review and apply migration 004.
 4. Run Supabase security advisors and verify the new tables have RLS enabled and no direct privileges for `anon` or `authenticated`.
 5. Pull/deploy the application branch and test with separate Admin, Manager and Staff accounts.
