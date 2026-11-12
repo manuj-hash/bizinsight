@@ -24,17 +24,29 @@ const getStaff = async (req, res) => {
             }
         }
 
-        const [{ data: staff, error }, { data: departments, error: departmentError }] = await Promise.all([
-            query,
-            db.from("departments").select("id,name,is_active").order("name")
-        ]);
-        if (error) throw error;
+        const staffRows = [];
+        const PAGE_SIZE = 500;
+        for (let from = 0; ; from += PAGE_SIZE) {
+            const { data: page, error } = await query.range(from, from + PAGE_SIZE - 1);
+            if (error) throw error;
+            staffRows.push(...(page || []));
+            if (!page || page.length < PAGE_SIZE) break;
+        }
+
+        const { data: departments, error: departmentError } = await db.from("departments")
+            .select("id,name,is_active").order("name");
         if (departmentError) throw departmentError;
 
-        const staffRows = staff || [];
-        const { data: authUsers, error: authUsersError } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        if (authUsersError) throw authUsersError;
-        const emailById = new Map((authUsers.users || []).map(user => [user.id, user.email || null]));
+        // Auth Admin listUsers is paginated; fetch every page before mapping emails.
+        const authUsers = [];
+        for (let page = 1; ; page += 1) {
+            const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+            if (error) throw error;
+            const batch = data?.users || [];
+            authUsers.push(...batch);
+            if (batch.length < 1000) break;
+        }
+        const emailById = new Map(authUsers.map(user => [user.id, user.email || null]));
         const ids = staffRows.map(person => person.id);
         let compensation = [];
         const canViewCompensation = req.profile.role === "admin" ||
