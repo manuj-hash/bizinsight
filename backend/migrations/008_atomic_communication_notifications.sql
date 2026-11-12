@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Make communication record creation and recipient notifications atomic.
 -- These functions are callable only by the trusted Express service-role backend.
 
@@ -118,3 +120,5 @@ REVOKE ALL ON FUNCTION public.create_bizinsight_issue(uuid,uuid,uuid[],text,text
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_bizinsight_issue(uuid,uuid,uuid[],text,text,text)
   TO service_role;
+
+COMMIT;
