@@ -8,7 +8,7 @@
 </style></head><body>
 <div class="sidebar"><h2>BizInsight</h2><a href="dashboard.html">Dashboard</a><a href="inventory.html">Inventory</a><a href="orders.html">Sales & Orders</a><a href="customers.html">Customers</a><a href="analytics.html">Analytics</a><a href="reports.html">Reports</a><a href="staff.html">User Management</a><a href="access-control.html">Access Control</a><a href="communication.html" class="active">Communication</a><a href="profile.html">Profile</a><a href="index.html" id="logoutLink">Logout</a></div>
 <div class="main-content"><main class="comm-wrap">
-<h1>Communication</h1><p class="muted">Coordinate department work, notify affected teams and escalate confidential concerns.</p><div id="status" class="status muted" role="status">Loading…</div>
+<h1>Communication</h1><p class="muted">Coordinate department work, notify affected teams and escalate confidential concerns.</p><div id="status" class="status muted" role="status">Loading…</div><section class="item"><h3>Notifications</h3><div id="notificationList" class="muted">Loading notifications…</div></section>
 <nav class="tabs" id="tabs"><button data-tab="team" class="active">Team Communication</button><button data-tab="general">General Announcements</button><button data-tab="issues">Work Issues</button><button data-tab="complaints">Complaints</button><button data-tab="responsibility">Responsibility</button></nav>
 <section id="team" class="panel active"><h2>Department messages</h2><div id="teamList"></div><h3>Send team message</h3><form id="teamForm"><div class="form-grid"><label>Subject<input name="title" required maxlength="160"></label><label>Priority<select name="priority"><option>normal</option><option>high</option><option>urgent</option></select></label><label class="wide">Message<textarea name="body" required maxlength="5000"></textarea></label></div><button class="primary">Send to department</button></form></section>
 <section id="general" class="panel"><h2>General operational announcements</h2><p class="muted">Use this for cross-department notices such as inventory delays affecting Sales.</p><div id="generalList"></div><form id="generalForm"><div class="form-grid"><label>Subject<input name="title" required maxlength="160"></label><label>Priority<select name="priority"><option>normal</option><option>high</option><option>urgent</option></select></label><label>Publishing department<select name="publisher_department_id" id="publisherDepartment"></select></label><label class="wide">Receiving departments<select name="target_department_ids" id="targetDepartments" multiple size="4"></select></label><label class="wide">Announcement<textarea name="body" required maxlength="5000"></textarea></label></div><button class="primary">Publish announcement</button></form></section>
@@ -25,6 +25,13 @@ function formData(form){return Object.fromEntries(new FormData(form).entries());
 function card(host,item,meta){const el=document.createElement("article");el.className="item";const h=document.createElement("h3");h.textContent=item.title||item.subject||meta;const small=document.createElement("div");small.className="muted";small.textContent=meta+" · "+new Date(item.created_at).toLocaleString("en-IN");const p=document.createElement("p");p.textContent=item.body||item.description||item.subject||"";el.append(h,small,p);host.appendChild(el);}
 function showTab(name){document.querySelectorAll(".panel").forEach(x=>x.classList.toggle("active",x.id===name));document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));}
 $("tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b)showTab(b.dataset.tab);});
+async function loadNotifications(){
+ const items=await api("/communication/notifications");const host=$("notificationList");host.replaceChildren();
+ const unread=items.filter(x=>!x.read_at).length;
+ const heading=document.createElement("p");heading.className="muted";heading.textContent=unread+" unread notifications";host.appendChild(heading);
+ items.forEach(item=>{const row=document.createElement("div");row.className="item";const title=document.createElement("strong");title.textContent=item.title;const meta=document.createElement("span");meta.className="muted";meta.textContent=" · "+item.notification_type+" · "+new Date(item.created_at).toLocaleString("en-IN");row.append(title,meta);if(!item.read_at){const button=document.createElement("button");button.className="primary";button.textContent="Mark as read";button.addEventListener("click",async()=>{try{await api("/communication/notifications/"+item.id+"/read",{method:"PATCH"});await loadNotifications();}catch(e){status(e.message,true);}});row.appendChild(button);}host.appendChild(row);});
+ if(!items.length)host.textContent="No notifications yet.";
+}
 async function loadMessages(){const items=await api("/communication/messages");$("teamList").replaceChildren();$("generalList").replaceChildren();items.forEach(x=>card(x.message_type==="team"?$("teamList"):$("generalList"),x,x.message_type));}
 async function loadIssues(){const items=await api("/communication/issues");$("issueList").replaceChildren();items.forEach(x=>card($("issueList"),x,x.status+" · "+x.priority));}
 async function loadComplaints(){const items=await api("/communication/complaints");$("complaintList").replaceChildren();items.forEach(x=>card($("complaintList"),x,x.status+" · Confidential"));}
@@ -50,12 +57,12 @@ async function init(){
   if(access.role!=="admin"&&access.department_id){$("responsibilityDepartment").value=access.department_id;$("responsibilityDepartment").disabled=true;$("publisherDepartment").value=access.department_id;$("publisherDepartment").disabled=true;}
   if(p.has("communication.responsibility.manage")||admin)await loadDepartmentMembers();
   departments.forEach(d=>{const o=document.createElement("option");o.value=d.id;o.textContent=d.name;$("targetDepartments").appendChild(o);});
-  const tasks=[];
+  const tasks=[loadNotifications()];
   if(admin||p.has("communication.team")||p.has("communication.access"))tasks.push(loadMessages());
   if(admin||p.has("communication.issues.access"))tasks.push(loadIssues());
   if(admin||p.has("communication.complaints.submit")||p.has("communication.complaints.review"))tasks.push(loadComplaints());
   if(admin||p.has("communication.responsibility.manage")||p.has("communication.general.publish"))tasks.push(loadResponsibility());
-  await Promise.all(tasks);status("Communication workspace ready.");
+  await Promise.all(tasks);status("Communication workspace ready.");setInterval(()=>loadNotifications().catch(()=>{}),30000);
  }catch(e){status(e.message,true);}
 }
 $("teamForm").addEventListener("submit",async e=>{e.preventDefault();try{await api("/communication/messages",{method:"POST",body:JSON.stringify({...formData(e.target),message_type:"team"})});e.target.reset();await loadMessages();status("Team message sent.");}catch(x){status(x.message,true);}});
