@@ -95,11 +95,12 @@ const setDelegation = async (req, res) => {
             if (result.error) throw result.error;
             saved = result.data;
         }
-        await db.from("permission_audit_logs").insert({
+        const { error: auditError } = await db.from("permission_audit_logs").insert({
             actor_id: req.user.id, target_user_id: manager_id, permission_code,
             action: is_active ? "delegate" : "undelegate",
             details: { department_id, can_grant: Boolean(can_grant), can_revoke: Boolean(can_revoke) }
         });
+        if (auditError) throw auditError;
         return res.json({ message: "Manager delegation updated", delegation: saved });
     } catch (error) {
         console.error("Set delegation:", error.message);
