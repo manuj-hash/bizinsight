@@ -25,13 +25,17 @@ async function createAccessNotification(db, { userId, actorId, eventType, permis
     };
     const template = templates[eventType];
     if (!template) throw new Error("Unsupported access notification event");
+    const { data: permission } = await db.from("permission_catalog")
+        .select("label").eq("code", permissionCode).maybeSingle();
+    const permissionLabel = permission?.label || permissionCode;
+    const message = template.message.replaceAll(permissionCode, permissionLabel);
     const { error } = await db.from("access_notifications").insert({
         user_id: userId,
         actor_id: actorId,
         event_type: eventType,
         permission_code: permissionCode,
         title: template.title,
-        message: template.message,
+        message,
         details
     });
     if (error) throw error;
