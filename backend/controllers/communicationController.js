@@ -147,12 +147,21 @@ const listComplaints=async(req,res)=>{
         if(req.profile.role!=="admin"&&!has(req,"communication.complaints.review")&&!has(req,"communication.complaints.submit"))
             return res.status(403).json({message:"Complaint access is not granted"});
         const db=getAdminClient();
-        let query=db.from("communication_complaints").select("*").order("created_at",{ascending:false}).limit(200);
-        if(req.profile.role==="staff")query=query.eq("submitted_by",req.user.id);
-        else if(req.profile.role==="manager"&&has(req,"communication.complaints.review")&&req.profile.manager_scope==="department")
-            query=query.eq("department_id",req.profile.department_id).eq("recipient_role","manager");
-        else if(req.profile.role==="manager")query=query.eq("submitted_by",req.user.id);
-        const {data,error}=await query;if(error)throw error;return res.json(data||[]);
+        const base=()=>db.from("communication_complaints").select("*").order("created_at",{ascending:false}).limit(200);
+        let rows=[];
+        if(req.profile.role==="admin"){
+            const {data,error}=await base();if(error)throw error;rows=data||[];
+        }else if(req.profile.role==="manager"&&req.profile.manager_scope==="department"&&has(req,"communication.complaints.review")){
+            const [own,routed]=await Promise.all([
+                base().eq("submitted_by",req.user.id),
+                base().eq("department_id",req.profile.department_id).eq("recipient_role","manager")
+            ]);
+            if(own.error)throw own.error;if(routed.error)throw routed.error;
+            rows=[...(own.data||[]),...(routed.data||[])].filter((item,index,array)=>array.findIndex(x=>x.id===item.id)===index);
+        }else{
+            const {data,error}=await base().eq("submitted_by",req.user.id);if(error)throw error;rows=data||[];
+        }
+        return res.json(rows);
     }catch(error){console.error("Complaints:",error.message);return res.status(500).json({message:"Unable to load complaints"});}
 };
 
