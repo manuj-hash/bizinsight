@@ -35,8 +35,10 @@ function applyActionVisibility(granted,admin){
  document.querySelectorAll("button").forEach(button=>{
   const label=(button.textContent||"").trim().toLowerCase();
   if(label.includes("download report"))hide(button,!can("reports.export"));
-  if(label.includes("record stock movement"))hide(button,!can("inventory.stock_movement"));
+  if(label.includes("stock movement")||label.includes("adjust stock"))hide(button,!can("inventory.stock_movement"));
   if(label==="add product")hide(button,!can("inventory.create"));
+  if(label.includes("create order"))hide(button,!can("orders.create"));
+  if(label.includes("update status")||label.includes("cancel order"))hide(button,!can("orders.update"));
   if(label==="edit")hide(button,!can("inventory.update")&&!can("orders.update"));
   if(label.includes("archive")||label.includes("delete"))hide(button,!can("inventory.archive"));
  });
@@ -50,6 +52,7 @@ async function init(){
   const granted=new Set(data.permissions||[]);
   const admin=data.role==="admin";
   document.querySelectorAll(".sidebar a[href]").forEach(link=>{
+   if(link.getAttribute("href")==="staff.html")link.textContent="User Management";
    const href=(link.getAttribute("href")||"").split("/").pop().split("?")[0];
    const required=hrefPermission[href];
    if(required&&!admin&&!hasAny(required,granted))link.hidden=true;
