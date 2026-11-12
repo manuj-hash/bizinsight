@@ -186,7 +186,6 @@ CREATE TRIGGER departments_set_updated_at
 
 -- 6. Atomic employee assignment RPC.
 CREATE OR REPLACE FUNCTION public.admin_set_bizinsight_employee(
-  p_actor_id uuid,
   p_employee_id uuid,
   p_role text,
   p_department_id uuid DEFAULT NULL,
@@ -195,7 +194,7 @@ CREATE OR REPLACE FUNCTION public.admin_set_bizinsight_employee(
   p_reports_to uuid DEFAULT NULL
 )
 RETURNS public.profiles
-LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $$
 DECLARE
   v_actor public.profiles%ROWTYPE;
@@ -203,14 +202,14 @@ DECLARE
   v_company_manager_id uuid;
   v_mode text;
 BEGIN
-  IF p_actor_id IS NULL OR p_employee_id IS NULL OR p_role IS NULL THEN
-    RAISE EXCEPTION 'Actor, employee and role are required';
+  IF auth.uid() IS NULL OR p_employee_id IS NULL OR p_role IS NULL THEN
+    RAISE EXCEPTION 'An authenticated actor, employee and role are required';
   END IF;
   IF p_actor_id = p_employee_id THEN
     RAISE EXCEPTION 'You cannot change your own employee role or assignment';
   END IF;
 
-  SELECT * INTO v_actor FROM public.profiles WHERE id = p_actor_id;
+  SELECT * INTO v_actor FROM public.profiles WHERE id = (SELECT auth.uid());
   IF NOT FOUND OR v_actor.role NOT IN ('admin', 'manager') THEN
     RAISE EXCEPTION 'Only Admin or an authorized Manager may manage staff';
   END IF;
@@ -299,26 +298,25 @@ BEGIN
   RETURN v_employee;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.admin_set_bizinsight_employee(uuid, uuid, text, uuid, text, text, uuid)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.admin_set_bizinsight_employee(uuid, uuid, text, uuid, text, text, uuid)
-  TO service_role;
+REVOKE ALL ON FUNCTION public.admin_set_bizinsight_employee(uuid, text, uuid, text, text, uuid)
+  FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_set_bizinsight_employee(uuid, text, uuid, text, text, uuid)
+  TO authenticated;
 
 -- 7. Atomic company preferences update.
 CREATE OR REPLACE FUNCTION public.update_bizinsight_preferences(
-  p_actor_id uuid,
   p_management_mode text DEFAULT NULL,
   p_frequent_customer_min_orders integer DEFAULT NULL,
   p_high_value_customer_amount numeric DEFAULT NULL
 )
 RETURNS public.company_preferences
-LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $$
 DECLARE
   v_actor public.profiles%ROWTYPE;
   v_result public.company_preferences%ROWTYPE;
 BEGIN
-  SELECT * INTO v_actor FROM public.profiles WHERE id = p_actor_id;
+  SELECT * INTO v_actor FROM public.profiles WHERE id = (SELECT auth.uid());
   IF NOT FOUND OR v_actor.role NOT IN ('admin', 'manager') THEN
     RAISE EXCEPTION 'Only Admin and Managers may update preferences';
   END IF;
@@ -346,7 +344,7 @@ BEGIN
   SET management_mode = COALESCE(p_management_mode, management_mode),
       frequent_customer_min_orders = COALESCE(p_frequent_customer_min_orders, frequent_customer_min_orders),
       high_value_customer_amount = COALESCE(p_high_value_customer_amount, high_value_customer_amount),
-      updated_by = p_actor_id,
+      updated_by = (SELECT auth.uid()),
       updated_at = now()
   WHERE id = true
   RETURNING * INTO v_result;
@@ -354,14 +352,13 @@ BEGIN
   RETURN v_result;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.update_bizinsight_preferences(uuid, text, integer, numeric)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.update_bizinsight_preferences(uuid, text, integer, numeric)
-  TO service_role;
+REVOKE ALL ON FUNCTION public.update_bizinsight_preferences(text, integer, numeric)
+  FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.update_bizinsight_preferences(text, integer, numeric)
+  TO authenticated;
 
 -- 8. Atomic compensation history update.
 CREATE OR REPLACE FUNCTION public.set_bizinsight_employee_compensation(
-  p_actor_id uuid,
   p_employee_id uuid,
   p_base_salary numeric,
   p_currency_code text DEFAULT 'INR',
@@ -370,7 +367,7 @@ CREATE OR REPLACE FUNCTION public.set_bizinsight_employee_compensation(
   p_notes text DEFAULT NULL
 )
 RETURNS public.employee_compensation
-LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $$
 DECLARE
   v_actor public.profiles%ROWTYPE;
@@ -378,7 +375,7 @@ DECLARE
   v_current public.employee_compensation%ROWTYPE;
   v_result public.employee_compensation%ROWTYPE;
 BEGIN
-  SELECT * INTO v_actor FROM public.profiles WHERE id = p_actor_id;
+  SELECT * INTO v_actor FROM public.profiles WHERE id = (SELECT auth.uid());
   SELECT * INTO v_employee FROM public.profiles WHERE id = p_employee_id FOR UPDATE;
   IF v_actor.id IS NULL OR v_actor.role NOT IN ('admin', 'manager') THEN
     RAISE EXCEPTION 'Only Admin or Managers may manage compensation';
@@ -394,18 +391,34 @@ BEGIN
     RAISE EXCEPTION 'Managers can manage compensation only within their authorized scope';
   END IF;
   IF p_base_salary IS NULL OR p_base_salary < 0 THEN RAISE EXCEPTION 'Invalid salary'; END IF;
+  IF p_effective_from IS NULL OR p_effective_from < CURRENT_DATE THEN
+    RAISE EXCEPTION 'Salary effective date cannot be in the past';
+  END IF;
   IF p_currency_code IS NULL OR p_currency_code !~ '^[A-Z]{3}$' THEN
     RAISE EXCEPTION 'Invalid currency code';
   END IF;
-  IF p_pay_frequency NOT IN ('hourly', 'weekly', 'monthly', 'yearly') THEN
+  IF p_pay_frequency IS NULL OR p_pay_frequency NOT IN ('hourly', 'weekly', 'monthly', 'yearly') THEN
     RAISE EXCEPTION 'Invalid pay frequency';
   END IF;
 
   SELECT * INTO v_current FROM public.employee_compensation
     WHERE profile_id = p_employee_id AND effective_to IS NULL FOR UPDATE;
+  IF FOUND AND p_effective_from = v_current.effective_from THEN
+    -- Same-day corrections update the current or scheduled row in place.
+    UPDATE public.employee_compensation
+      SET base_salary = p_base_salary,
+          currency_code = p_currency_code,
+          pay_frequency = p_pay_frequency,
+          notes = NULLIF(btrim(COALESCE(p_notes, '')), ''),
+          created_by = (SELECT auth.uid())
+      WHERE id = v_current.id
+      RETURNING * INTO v_result;
+    RETURN v_result;
+  END IF;
+
   IF FOUND THEN
-    IF p_effective_from <= v_current.effective_from THEN
-      RAISE EXCEPTION 'New salary effective date must follow the current salary date';
+    IF p_effective_from < v_current.effective_from THEN
+      RAISE EXCEPTION 'New salary effective date must not precede the existing scheduled salary';
     END IF;
     UPDATE public.employee_compensation
       SET effective_to = p_effective_from - 1
@@ -417,16 +430,16 @@ BEGIN
     effective_from, notes, created_by
   ) VALUES (
     p_employee_id, p_base_salary, p_currency_code, p_pay_frequency,
-    p_effective_from, NULLIF(btrim(COALESCE(p_notes, '')), ''), p_actor_id
+    p_effective_from, NULLIF(btrim(COALESCE(p_notes, '')), ''), (SELECT auth.uid())
   )
   RETURNING * INTO v_result;
 
   RETURN v_result;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.set_bizinsight_employee_compensation(uuid, uuid, numeric, text, text, date, text)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.set_bizinsight_employee_compensation(uuid, uuid, numeric, text, text, date, text)
-  TO service_role;
+REVOKE ALL ON FUNCTION public.set_bizinsight_employee_compensation(uuid, numeric, text, text, date, text)
+  FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.set_bizinsight_employee_compensation(uuid, numeric, text, text, date, text)
+  TO authenticated;
 
 COMMIT;
