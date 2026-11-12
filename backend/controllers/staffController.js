@@ -64,6 +64,7 @@ const getStaff = async (req, res) => {
 
 const inviteEmployee = async (req, res) => {
     try {
+        if (!["admin", "manager"].includes(req.profile.role)) return res.status(403).json({ message: "Only Admin or an authorized Manager can invite employees" });
         const full_name = String(req.body.full_name || "").trim();
         const email = String(req.body.email || "").trim().toLowerCase();
         const phone = String(req.body.phone || "").trim();
@@ -171,6 +172,7 @@ const getDepartments = async (req, res) => {
 
 const createDepartment = async (req, res) => {
     try {
+        if (!["admin", "manager"].includes(req.profile.role)) return res.status(403).json({ message: "Only Admin or an authorized company Manager can create departments" });
         if (req.profile.role === "manager" && req.profile.manager_scope !== "company") {
             return res.status(403).json({ message: "Only Admin or the Overall Manager can create departments" });
         }
