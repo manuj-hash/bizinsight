@@ -52,10 +52,17 @@ const getStaff = async (req, res) => {
         const canViewCompensation = req.profile.role === "admin" ||
             (req.permissions && req.permissions.has("staff.compensation.view"));
         if (ids.length && canViewCompensation) {
-            const result = await db.from("employee_compensation")
-                .select("id,profile_id,base_salary,currency_code,pay_frequency,effective_from,effective_to")
-                .in("profile_id", ids)
-                .is("effective_to", null);
+            // Managers may view Staff compensation only; Admin may view all
+            // non-admin employee compensation.
+            const compensationIds = req.profile.role === "admin"
+                ? ids
+                : staffRows.filter(person => person.role === "staff").map(person => person.id);
+            const result = compensationIds.length
+                ? await db.from("employee_compensation")
+                    .select("id,profile_id,base_salary,currency_code,pay_frequency,effective_from,effective_to")
+                    .in("profile_id", compensationIds)
+                    .is("effective_to", null)
+                : { data: [], error: null };
             if (result.error) throw result.error;
             compensation = result.data || [];
         }
