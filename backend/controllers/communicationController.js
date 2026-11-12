@@ -277,9 +277,10 @@ const listComplaintTargets=async(req,res)=>{
 
 const listAnnouncementDepartments=async(req,res)=>{
     try{
-        if(!has(req,"communication.general.publish")&&!has(req,"communication.responsibility.manage"))
+        if(!has(req,"communication.general.publish")&&!has(req,"communication.responsibility.manage")&&!has(req,"communication.team"))
             return res.status(403).json({message:"General announcement or responsibility access is not granted"});
         let query=getAdminClient().from("departments").select("id,name").eq("is_active",true).order("name");
+        if(!has(req,"communication.general.publish")&&req.profile.role!=="admin"&&req.profile.manager_scope!=="company")query=query.eq("id",req.profile.department_id);
         const {data,error}=await query;
         if(error)throw error;
         return res.json(data||[]);
