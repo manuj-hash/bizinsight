@@ -73,7 +73,6 @@ const addProduct = async (req, res) => {
                 category: category || null,
                 price: sellingPrice,
                 cost_price: costPrice,
-                stock_quantity: 0,
                 reorder_level: reorderLevel
             }])
             .select()
@@ -186,7 +185,7 @@ const updateProduct = async (req, res) => {
 // Archive instead of physically deleting a product referenced by historical orders.
 const deleteProduct = async (req, res) => {
     try {
-        const { data, error } = await req.supabase
+        const { data, error } = await getAdminClient()
             .from("products")
             .update({ is_active: false })
             .eq("id", req.params.id)
