@@ -1,76 +1,43 @@
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+const adminKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !publishableKey) {
     throw new Error("SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are required");
 }
 
-function createAuthClient() {
-    // Auth clients are request-scoped because signInWithPassword mutates the
-    // SDK's in-memory session. Never share that state across users.
-    return createClient(supabaseUrl, publishableKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false
-        }
-    });
-}
-
-// Every authenticated request gets its own client carrying that user's JWT.
-// This is essential: validating a token with auth.getUser() does not, by itself,
-// attach that token to later PostgREST/RPC requests.
-function createUserClient(accessToken) {
-    if (!accessToken || typeof accessToken !== "string") {
-        throw new Error("A valid Supabase access token is required");
+const authOptions = {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
     }
-
-    return createClient(supabaseUrl, publishableKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false
-        },
-        global: {
-            headers: {
-                Authorization: `Bearer ${accessToken}`
-            }
-        }
-    });
-}
-
-// Privileged operations (Auth Admin and service_role-only RPCs) must use a
-// server-only secret. Never import this client into frontend code.
-let adminClient;
-
-function getAdminClient() {
-    const secretKey =
-        process.env.SUPABASE_SECRET_KEY ||
-        process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!secretKey) {
-        throw new Error(
-            "SUPABASE_SECRET_KEY is required for this administrator operation"
-        );
-    }
-
-    if (!adminClient) {
-        adminClient = createClient(supabaseUrl, secretKey, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false,
-                detectSessionInUrl: false
-            }
-        });
-    }
-
-    return adminClient;
-}
-
-module.exports = {
-    createAuthClient,
-    createUserClient,
-    getAdminClient
 };
+
+// Use this client only for public sign-in operations.
+const createAnonClient = () => createClient(supabaseUrl, publishableKey, authOptions);
+
+// Every authenticated request gets its own client, scoped to that user's JWT.
+// This makes Postgres RLS policies apply to the actual signed-in user.
+const createUserClient = (accessToken) => {
+    if (!accessToken) throw new Error("An access token is required");
+    return createClient(supabaseUrl, publishableKey, {
+        ...authOptions,
+        global: {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        }
+    });
+};
+
+// Privileged operations must only run on the server after authorization.
+// Never expose this client or its key to browser code.
+const getAdminClient = () => {
+    if (!adminKey) {
+        throw new Error("SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is required for this administrator operation");
+    }
+    return createClient(supabaseUrl, adminKey, authOptions);
+};
+
+module.exports = { createAnonClient, createUserClient, getAdminClient };
