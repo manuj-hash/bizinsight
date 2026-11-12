@@ -120,7 +120,7 @@ const getInventoryAnalytics = async (req, res) => {
         const products = await fetchAllRows(
             req.supabase,
             "products",
-            "id, sku, name, category, price, stock_quantity, reorder_level, is_active",
+            "id, sku, name, category, price, cost_price, stock_quantity, reorder_level, is_active",
             "name"
         );
 
