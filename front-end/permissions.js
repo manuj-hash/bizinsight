@@ -21,6 +21,26 @@ const hrefPermission={
  "communication.html":["communication.access"]
 };
 function hasAny(list,granted){return list.some(code=>granted.has(code));}
+function applyActionVisibility(granted,admin){
+ const can=code=>admin||granted.has(code);
+ const hide=(node,condition)=>{if(node&&node.hidden!==condition)node.hidden=condition;};
+ hide(document.getElementById("productForm"),!can("inventory.create")&&!can("inventory.update"));
+ hide(document.getElementById("submitBtn"),!can("inventory.create")&&!can("inventory.update"));
+ hide(document.getElementById("createOrderButton"),!can("orders.create"));
+ hide(document.getElementById("inviteForm"),!can("staff.manage"));
+ hide(document.getElementById("inviteButton"),!can("staff.manage"));
+ hide(document.getElementById("departmentForm"),!can("staff.departments.manage"));
+ hide(document.getElementById("createDepartmentButton"),!can("staff.departments.manage"));
+ hide(document.getElementById("preferencesForm"),!can("staff.departments.manage"));
+ document.querySelectorAll("button").forEach(button=>{
+  const label=(button.textContent||"").trim().toLowerCase();
+  if(label.includes("download report"))hide(button,!can("reports.export"));
+  if(label.includes("record stock movement"))hide(button,!can("inventory.stock_movement"));
+  if(label==="add product")hide(button,!can("inventory.create"));
+  if(label==="edit")hide(button,!can("inventory.update")&&!can("orders.update"));
+  if(label.includes("archive")||label.includes("delete"))hide(button,!can("inventory.archive"));
+ });
+}
 async function init(){
  if(!token())return;
  try{
@@ -55,6 +75,8 @@ async function init(){
    return;
   }
   window.bizInsightAccess={role:data.role,permissions:granted,delegations:data.delegations||[]};
+  applyActionVisibility(granted,admin);
+  if(!window.__bizInsightPermissionObserver){window.__bizInsightPermissionObserver=new MutationObserver(()=>applyActionVisibility(granted,admin));window.__bizInsightPermissionObserver.observe(document.body,{childList:true,subtree:true});}
   document.dispatchEvent(new CustomEvent("bizinsight:access-ready",{detail:window.bizInsightAccess}));
  }catch(error){console.error("BizInsight access check:",error);document.body.innerHTML='<main style="padding:32px;font-family:Arial"><h2>Access could not be verified</h2><p>Please sign in again or contact your administrator.</p><a href="index.html">Return to login</a></main>';}
 }
