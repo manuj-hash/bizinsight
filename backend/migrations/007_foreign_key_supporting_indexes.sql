@@ -52,6 +52,6 @@ BEGIN
       column_list
     );
   END LOOP;
-END $$;
+END $fk$;
 
 COMMIT;
