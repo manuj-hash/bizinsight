@@ -185,19 +185,20 @@ const updateProduct = async (req, res) => {
 // Archive instead of physically deleting a product referenced by historical orders.
 const deleteProduct = async (req, res) => {
     try {
-        const { data, error } = await getAdminClient()
-            .from("products")
-            .update({ is_active: false })
-            .eq("id", req.params.id)
-            .select()
-            .maybeSingle();
-
+        const db = getAdminClient();
+        const { data: archivedId, error } = await db.rpc("archive_bizinsight_product", {
+            p_actor_id: req.user.id,
+            p_product_id: req.params.id
+        });
         if (error) throw error;
-        if (!data) return res.status(404).json({ message: "Product not found" });
+        if (!archivedId) return res.status(404).json({ message: "Product not found" });
 
+        const { data: product, error: fetchError } = await db.from("products")
+            .select("*").eq("id", archivedId).single();
+        if (fetchError) throw fetchError;
         return res.status(200).json({
             message: "Product archived. Historical order records are preserved.",
-            product: data
+            product
         });
     } catch (error) {
         return res.status(400).json({ message: error.message || "Unable to archive product" });
