@@ -220,7 +220,7 @@ GRANT SELECT ON public.customers TO authenticated;
 
 ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.departments FROM anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.departments TO authenticated;
+GRANT SELECT ON public.departments TO authenticated;
 DROP POLICY IF EXISTS "Admins and managers read departments" ON public.departments;
 CREATE POLICY "Admins and managers read departments"
   ON public.departments FOR SELECT TO authenticated
