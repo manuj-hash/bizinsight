@@ -38,7 +38,7 @@ ALTER TABLE public.profiles ADD CONSTRAINT profiles_manager_assignment_check
     (role = 'manager' AND manager_scope = 'company'
       AND department_id IS NULL AND reports_to IS NULL)
     OR (role = 'manager' AND manager_scope = 'department'
-      AND department_id IS NOT NULL AND reports_to IS NOT NULL)
+      AND department_id IS NOT NULL AND reports_to IS NOT NULL AND reports_to <> id)
     OR role <> 'manager'
   );
 
@@ -304,8 +304,8 @@ BEGIN
       IF v_mode <> 'manager_hierarchy' THEN RAISE EXCEPTION 'Enable Manager hierarchy first'; END IF;
       SELECT id INTO v_company_manager_id FROM public.profiles
         WHERE role = 'manager' AND manager_scope = 'company' LIMIT 1;
-      IF v_company_manager_id IS NULL OR p_department_id IS NULL
-         OR p_reports_to IS DISTINCT FROM v_company_manager_id THEN
+      IF v_company_manager_id IS NULL OR v_company_manager_id = p_employee_id
+         OR p_department_id IS NULL OR p_reports_to IS DISTINCT FROM v_company_manager_id THEN
         RAISE EXCEPTION 'Department Managers must report to the company-wide Manager and have a department';
       END IF;
     END IF;
