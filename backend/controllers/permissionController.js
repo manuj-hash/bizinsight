@@ -41,7 +41,7 @@ const catalog = async (req, res) => {
 const getDelegations = async (req, res) => {
     try {
         const db = getAdminClient();
-        let query = db.from("manager_delegations").select("*,profiles!manager_delegations_manager_id_fkey(full_name,role,department_id)").order("granted_at", { ascending: false });
+        let query = db.from("manager_delegations").select("*").order("granted_at", { ascending: false });
         if (req.profile.role !== "admin") query = query.eq("manager_id", req.user.id);
         const { data, error } = await query;
         if (error) throw error;
