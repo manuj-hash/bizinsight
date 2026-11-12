@@ -68,6 +68,41 @@ $function$;
 REVOKE ALL ON FUNCTION private.can_view_employee_compensation(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private.can_view_employee_compensation(uuid) TO authenticated, service_role;
 
+-- Admin-only archival RPC preserves the database trigger's actor check
+-- while allowing the service-role backend to pass the verified actor ID.
+CREATE OR REPLACE FUNCTION public.archive_bizinsight_product(
+  p_actor_id uuid,
+  p_product_id uuid
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $function$
+DECLARE
+  archived_id uuid;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = p_actor_id AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Only an administrator may archive or reactivate records';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', p_actor_id::text, true);
+
+  UPDATE public.products
+  SET is_active = false
+  WHERE id = p_product_id
+  RETURNING id INTO archived_id;
+
+  RETURN archived_id;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.archive_bizinsight_product(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.archive_bizinsight_product(uuid, uuid) TO service_role;
+
 -- Never allow anonymous access to company records.
 REVOKE ALL ON TABLE
   public.profiles,
