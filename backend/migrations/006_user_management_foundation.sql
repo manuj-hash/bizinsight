@@ -42,7 +42,7 @@ ALTER TABLE public.profiles ADD CONSTRAINT profiles_manager_assignment_check
       AND department_id IS NULL AND reports_to IS NULL)
     OR (role = 'manager' AND manager_scope = 'department'
       AND department_id IS NOT NULL AND reports_to IS NOT NULL AND reports_to <> id)
-    OR role <> 'manager'
+    OR (role <> 'manager' AND manager_scope IS NULL)
   );
 
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_one_company_manager_uidx
