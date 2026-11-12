@@ -83,7 +83,7 @@
 <section class="section-card">
 <h2>Employees</h2>
 <button type="button" id="refreshStaff">Refresh staff</button>
-<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Department</th><th>Designation</th><th>Salary</th><th>Actions</th></tr></thead><tbody id="staffBody"><tr><td colspan="6">Loading staff…</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Email</th><th>Phone</th><th>Role</th><th>Department</th><th>Designation</th><th>Salary</th><th>Actions</th></tr></thead><tbody id="staffBody"><tr><td colspan="8">Loading staff…</td></tr></tbody></table></div>
 </section>
 </div></div>
 <script>
@@ -120,7 +120,7 @@ async function loadStaff(){
  const body=$("staffBody");body.replaceChildren();
  try{
   staff=await api("/staff");
-  if(!staff.length){body.innerHTML='<tr><td colspan="6">No employee profiles found.</td></tr>';return;}
+  if(!staff.length){body.innerHTML='<tr><td colspan="8">No employee profiles found.</td></tr>';return;}
   staff.forEach(person=>{
    const row=body.insertRow();
    cell(row,person.full_name);
@@ -140,7 +140,7 @@ async function loadStaff(){
    salaryBtn.addEventListener("click",()=>setSalary(person));
    actions.append(salaryBtn);
   });
- }catch(error){body.innerHTML='<tr><td colspan="6">Unable to load employees.</td></tr>';showMessage(error.message,true);}
+ }catch(error){body.innerHTML='<tr><td colspan="8">Unable to load employees.</td></tr>';showMessage(error.message,true);}
 }
 function editEmployee(person){
  const role=prompt("Role: staff or manager",person.role);
